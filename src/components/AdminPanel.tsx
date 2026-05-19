@@ -628,6 +628,22 @@ export default function AdminPanel() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      <footer className="mt-20 py-12 border-t border-zinc-900 bg-black/20 backdrop-blur-sm flex flex-col items-center gap-6 text-zinc-600">
+        <div className="flex items-center gap-8 text-[10px] font-black uppercase tracking-[0.2em]">
+          <a href="https://github.com/hpgalvao/Gerador-Dojo" target="_blank" className="hover:text-amber-500 transition-all flex items-center gap-2">
+            GitHub Repo
+          </a>
+          <span className="w-1 h-1 rounded-full bg-zinc-800"></span>
+          <a href="https://selectone.com.br" target="_blank" className="hover:text-amber-500 transition-all">SelectOne</a>
+          <span className="w-1 h-1 rounded-full bg-zinc-800"></span>
+          <a href="https://goldenfight.com.br" target="_blank" className="hover:text-amber-500 transition-all">Golden Fight</a>
+        </div>
+        <div className="text-center space-y-1">
+          <p className="text-[9px] font-mono opacity-50 italic">Desenvolvido com ❤️ por Helio P. Galvão</p>
+          <p className="text-[8px] font-mono tracking-widest uppercase text-zinc-700">Professor de BJJ & Dev Fullstack since 1998</p>
+        </div>
+      </footer>
     </div>
   );
 }

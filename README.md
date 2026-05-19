@@ -1,15 +1,26 @@
-# Dojô Landing Page Generator 🥋
+# Gerador Dojô 🥋
 
 Este projeto é uma ferramenta completa para gerar landing pages de alta conversão para Dojôs e Academias. Ele permite criar múltiplas rotas (ex: `/sao-paulo/jiu-jitsu`) a partir de um único painel administrativo.
 
+## 👤 Sobre o Autor
+
+Desenvolvido por **Helio P. Galvão**, professor de Jiu-Jitsu e Defesa Pessoal, além de Programador Fullstack com experiência desde 1998 (Clipper 5, Object Pascal, PHP, Python). 
+
+Atualmente focado em soluções tecnológicas para nichos específicos como Academias e Restaurantes. 
+- 🏢 Empresa: [SelectOne](https://selectone.com.br)
+- 🥋 Equipe: [Golden Fight](https://goldenfight.com.br)
+
 ## 📥 Como Clonar do GitHub
 
-Se este projeto já está no seu GitHub, siga estes passos:
+Este projeto oficial está hospedado em:
+**[https://github.com/hpgalvao/Gerador-Dojo](https://github.com/hpgalvao/Gerador-Dojo)**
+
+Para utilizar em seu computador:
 
 1. **Clone o repositório**:
    ```bash
-   git clone <URL_DO_SEU_REPOSITORIO>
-   cd <NOME_DA_PASTA>
+   git clone https://github.com/hpgalvao/Gerador-Dojo.git
+   cd Gerador-Dojo
    ```
 2. **Instale as dependências**:
    ```bash

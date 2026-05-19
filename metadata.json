@@ -1,6 +1,6 @@
 {
-  "name": "Dojo Landing Page Generator",
-  "description": "Painel para geração de landing pages personalizadas para Dojôs de Jiu-Jitsu, com gerenciamento de imagens, textos e rotas por cidade/modalidade.",
+  "name": "Gerador Dojô",
+  "description": "Ferramenta profissional para criação de Landing Pages para Dojôs e Academias. Desenvolvido por Helio P. Galvão.",
   "requestFramePermissions": [
     "camera",
     "microphone"

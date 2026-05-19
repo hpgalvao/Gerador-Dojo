@@ -437,7 +437,7 @@ export default function LandingPage() {
         <div>Propriedade: {config.academyName} • {config.city}</div>
         <div className="flex gap-6">
           <span className="text-amber-500/50">Campanha: {campaign}</span>
-          <span>Template ID: #SLEEK-V2</span>
+          <span>Tecnologia por <a href="https://github.com/hpgalvao/Gerador-Dojo" target="_blank" rel="noopener noreferrer" className="hover:text-white underline underline-offset-2">Helio P. Galvão</a></span>
         </div>
         <div className="flex gap-2 items-center">
           <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
@@ -459,6 +459,9 @@ export default function LandingPage() {
           <MessageCircle size={32} className="text-white" />
         </div>
       </a>
+      <div className="text-center py-6 bg-black text-[8px] text-zinc-800 uppercase tracking-[0.4em] font-mono border-t border-white/5">
+        Built by <a href="https://selectone.com.br" target="_blank" className="hover:text-amber-500 transition-colors">SelectOne</a> & <a href="https://goldenfight.com.br" target="_blank" className="hover:text-amber-500 transition-colors">Golden Fight</a>
+      </div>
     </div>
   );
 }
