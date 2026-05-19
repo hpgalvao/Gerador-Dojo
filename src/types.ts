@@ -76,6 +76,16 @@ export interface LandingPageConfig {
   vslSubheadline?: string;
   vslCtaText?: string;
   vslUnlockType?: 'seconds' | 'end';
+  // New section titles and texts
+  heroSubtitle?: string;
+  formTitle?: string;
+  formBadge?: string;
+  sectionVideoTitle?: string;
+  sectionImagesTitle?: string;
+  sectionImagesSubtitle?: string;
+  sectionImagesDescription?: string;
+  sectionTestimonialsTitle?: string;
+  heroStats?: { value: string; label: string }[];
 }
 
 export interface Lead {

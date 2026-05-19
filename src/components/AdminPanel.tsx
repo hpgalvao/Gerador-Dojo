@@ -474,6 +474,9 @@ const ChatFlowEditor = ({ config, onChange, onUpdatePage }: { config: ChatConfig
 
 export default function AdminPanel() {
   const [pages, setPages] = useState<LandingPageConfig[]>([]);
+  const [viewMode, setViewMode] = useState<'card' | 'list'>('card');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 8;
   const [leads, setLeads] = useState<Lead[]>([]);
   const [activeTab, setActiveTab] = useState<'pages' | 'leads' | 'settings'>('pages');
   const [isEditing, setIsEditing] = useState(false);
@@ -607,6 +610,11 @@ export default function AdminPanel() {
         updatedAt: new Date().toISOString(),
         primaryColor: '#cc0000',
         showForm: true,
+        heroStats: [
+          { value: '+500', label: 'Alunos' },
+          { value: '100%', label: 'Black Belts' },
+          { value: '24/7', label: 'Vagas' }
+        ],
         testimonials: [
           { name: 'Ricardo', role: 'Aluno há 2 anos', text: 'Mudei minha disposição depois que comecei no Dojô.' }
         ],
@@ -643,7 +651,7 @@ export default function AdminPanel() {
   });
 
   useEffect(() => {
-    const unsubPages = onSnapshot(query(collection(db, 'landing_pages'), orderBy('updatedAt', 'desc')), (snap) => {
+    const unsubPages = onSnapshot(query(collection(db, 'landing_pages'), orderBy('academyName', 'asc')), (snap) => {
       setPages(snap.docs.map(d => ({ id: d.id, ...d.data() } as LandingPageConfig)));
     });
     const unsubLeads = onSnapshot(query(collection(db, 'leads'), orderBy('createdAt', 'desc')), (snap) => {
@@ -782,6 +790,13 @@ export default function AdminPanel() {
     setEditingPage({ ...editingPage, images: i });
   };
 
+  const indexOfLastPage = currentPage * itemsPerPage;
+  const indexOfFirstPage = indexOfLastPage - itemsPerPage;
+  const currentPages = pages.slice(indexOfFirstPage, indexOfLastPage);
+  const totalPages = Math.ceil(pages.length / itemsPerPage);
+
+  const paginate = (pageNumber: number) => setCurrentPage(pageNumber);
+
   return (
     <div className="min-h-screen bg-[#0F0F10] text-white font-sans p-6 md:p-12 selection:bg-amber-500/30">
       <div className="max-w-6xl mx-auto">
@@ -845,65 +860,173 @@ export default function AdminPanel() {
               <span className="font-black uppercase tracking-[0.2em] text-lg font-display italic">Lançar Nova Landing Page</span>
             </motion.button>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {pages.map(page => (
-                <motion.div 
-                  layoutId={page.id}
-                  key={page.id} 
-                  className="bg-zinc-900/50 p-8 rounded-[32px] border border-zinc-800 flex flex-col justify-between hover:border-zinc-700 transition-all group"
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex bg-zinc-900 border border-zinc-800 p-1 rounded-xl">
+                <button 
+                  onClick={() => setViewMode('card')}
+                  className={`p-2 rounded-lg transition-all ${viewMode === 'card' ? 'bg-amber-500 text-black' : 'text-zinc-500 hover:text-white'}`}
+                  title="Vista em Cards"
                 >
-                  <div>
-                    <div className="flex justify-between items-start mb-6">
-                      <div className="flex flex-col gap-2">
-                        <div className="bg-amber-500/10 text-amber-500 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest border border-amber-500/20 w-fit">
-                          {page.modality}
-                        </div>
-                        <div className={`px-2 py-0.5 rounded text-[8px] font-bold uppercase tracking-tighter w-fit border ${page.type === 'chat' ? 'bg-blue-500/10 text-blue-500 border-blue-500/20' : 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'}`}>
-                          {page.type === 'chat' ? 'Chat Flow' : 'Classic LP'}
-                        </div>
-                      </div>
-                      <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button onClick={() => handleDuplicate(page)} className="p-2.5 bg-zinc-800 hover:bg-zinc-700 rounded-xl text-zinc-400 hover:text-white transition-all" title="Duplicar">
-                          <Copy size={16} />
-                        </button>
-                        <button onClick={() => handleEdit(page)} className="p-2.5 bg-zinc-800 hover:bg-zinc-700 rounded-xl text-zinc-400 hover:text-white transition-all" title="Editar">
-                          <Edit2 size={16} />
-                        </button>
-                        <button onClick={() => handleDelete(page)} className="p-2.5 bg-zinc-800 hover:bg-red-500/20 rounded-xl text-zinc-400 hover:text-red-500 transition-all" title="Excluir">
-                          <Trash2 size={16} />
-                        </button>
-                      </div>
-                    </div>
-                    <h3 className="text-2xl font-black mb-1 font-display tracking-tight uppercase italic">{page.city}</h3>
-                    <p className="text-[10px] text-zinc-600 mb-6 font-mono tracking-widest">
-                      Rota: {page.type === 'chat' ? '/chat' : '/lp'}/{slugify(page.city)}/{slugify(page.modality)}
-                    </p>
-                    <p className="text-zinc-500 text-sm line-clamp-2 mb-8 leading-relaxed italic">"{page.title}"</p>
-                  </div>
-                  
-                  <div className="flex gap-2">
-                    <a 
-                      href={`${page.type === 'chat' ? '/chat' : '/lp'}/${slugify(page.city)}/${slugify(page.modality)}`} 
-                      target="_blank"
-                      className="flex-1 bg-white text-black py-4 rounded-2xl text-center text-xs font-black uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-amber-500 transition-all shadow-xl shadow-white/5"
-                    >
-                      Site <ExternalLink size={14} />
-                    </a>
-                    <button 
-                      onClick={() => {
-                        const url = `${window.location.origin}${page.type === 'chat' ? '/chat' : '/lp'}/${slugify(page.city)}/${slugify(page.modality)}`;
-                        navigator.clipboard.writeText(url);
-                        alert("Link copiado!");
-                      }}
-                      className="p-4 bg-zinc-800 text-zinc-400 rounded-2xl hover:bg-zinc-700 transition-all hover:text-white"
-                      title="Copiar Link"
-                    >
-                      <Copy size={18} />
-                    </button>
-                  </div>
-                </motion.div>
-              ))}
+                  <Grid size={18} />
+                </button>
+                <button 
+                  onClick={() => setViewMode('list')}
+                  className={`p-2 rounded-lg transition-all ${viewMode === 'list' ? 'bg-amber-500 text-black' : 'text-zinc-500 hover:text-white'}`}
+                  title="Vista em Lista"
+                >
+                  <List size={18} />
+                </button>
+              </div>
+              <div className="text-[10px] uppercase font-black tracking-widest text-zinc-600">
+                Mostrando {indexOfFirstPage + 1}-{Math.min(indexOfLastPage, pages.length)} de {pages.length}
+              </div>
             </div>
+
+            {viewMode === 'card' ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                {currentPages.map(page => (
+                  <motion.div 
+                    layoutId={page.id}
+                    key={page.id} 
+                    className="bg-zinc-900/50 p-8 rounded-[32px] border border-zinc-800 flex flex-col justify-between hover:border-zinc-700 transition-all group"
+                  >
+                    <div>
+                      <div className="flex justify-between items-start mb-6">
+                        <div className="flex flex-col gap-2">
+                          <div className="flex items-center gap-2">
+                            <div className="bg-amber-500/10 text-amber-500 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest border border-amber-500/20 w-fit">
+                              {page.modality}
+                            </div>
+                            <div className="bg-zinc-800 text-zinc-500 px-2 py-1 rounded text-[8px] font-mono border border-white/5">
+                              #{page.id?.slice(-6).toUpperCase()}
+                            </div>
+                          </div>
+                          <div className={`px-2 py-0.5 rounded text-[8px] font-bold uppercase tracking-tighter w-fit border ${page.type === 'chat' ? 'bg-blue-500/10 text-blue-500 border-blue-500/20' : 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'}`}>
+                            {page.type === 'chat' ? 'Chat Flow' : 'Classic LP'}
+                          </div>
+                        </div>
+                        <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button onClick={() => handleDuplicate(page)} className="p-2.5 bg-zinc-800 hover:bg-zinc-700 rounded-xl text-zinc-400 hover:text-white transition-all" title="Duplicar">
+                            <Copy size={16} />
+                          </button>
+                          <button onClick={() => handleEdit(page)} className="p-2.5 bg-zinc-800 hover:bg-zinc-700 rounded-xl text-zinc-400 hover:text-white transition-all" title="Editar">
+                            <Edit2 size={16} />
+                          </button>
+                          <button onClick={() => handleDelete(page)} className="p-2.5 bg-zinc-800 hover:bg-red-500/20 rounded-xl text-zinc-400 hover:text-red-500 transition-all" title="Excluir">
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      </div>
+                      <h3 className="text-2xl font-black mb-1 font-display tracking-tight uppercase italic">{page.city}</h3>
+                      <p className="text-[10px] text-zinc-600 mb-6 font-mono tracking-widest">
+                        Rota: {page.type === 'chat' ? '/chat' : '/lp'}/{slugify(page.city)}/{slugify(page.modality)}
+                      </p>
+                      <p className="text-zinc-500 text-sm line-clamp-2 mb-8 leading-relaxed italic">"{page.title}"</p>
+                    </div>
+                    
+                    <div className="flex gap-2">
+                      <a 
+                        href={`${page.type === 'chat' ? '/chat' : '/lp'}/${slugify(page.city)}/${slugify(page.modality)}`} 
+                        target="_blank"
+                        className="flex-1 bg-white text-black py-4 rounded-2xl text-center text-xs font-black uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-amber-500 transition-all shadow-xl shadow-white/5"
+                      >
+                        Site <ExternalLink size={14} />
+                      </a>
+                      <button 
+                        onClick={() => {
+                          const url = `${window.location.origin}${page.type === 'chat' ? '/chat' : '/lp'}/${slugify(page.city)}/${slugify(page.modality)}`;
+                          navigator.clipboard.writeText(url);
+                          alert("Link copiado!");
+                        }}
+                        className="p-4 bg-zinc-800 text-zinc-400 rounded-2xl hover:bg-zinc-700 transition-all hover:text-white"
+                        title="Copiar Link"
+                      >
+                        <Copy size={18} />
+                      </button>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+            ) : (
+                <div className="bg-zinc-900/30 rounded-[32px] border border-zinc-800 overflow-hidden">
+                    <table className="w-full text-left">
+                        <thead>
+                            <tr className="bg-zinc-900/80 border-b border-zinc-800">
+                                <th className="px-8 py-6 font-black text-[10px] uppercase tracking-[0.3em] text-zinc-600">ID / Tipo</th>
+                                <th className="px-8 py-6 font-black text-[10px] uppercase tracking-[0.3em] text-zinc-600">Localização</th>
+                                <th className="px-8 py-6 font-black text-[10px] uppercase tracking-[0.3em] text-zinc-600">Título</th>
+                                <th className="px-8 py-6 font-black text-[10px] uppercase tracking-[0.3em] text-zinc-600 text-right">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-zinc-800/50">
+                            {currentPages.map(page => (
+                                <tr key={page.id} className="hover:bg-zinc-800/30 transition-colors group">
+                                    <td className="px-8 py-6">
+                                        <div className="flex flex-col gap-1">
+                                            <span className="text-[10px] font-mono text-zinc-500">#{page.id}</span>
+                                            <span className={`px-2 py-0.5 rounded text-[8px] font-bold uppercase tracking-tighter w-fit border ${page.type === 'chat' ? 'bg-blue-500/10 text-blue-500 border-blue-500/20' : 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'}`}>
+                                                {page.type === 'chat' ? 'Chat' : 'LP'}
+                                            </span>
+                                        </div>
+                                    </td>
+                                    <td className="px-8 py-6">
+                                        <h4 className="font-bold text-zinc-200">{page.city}</h4>
+                                        <p className="text-[10px] text-zinc-600 uppercase tracking-widest">{page.modality}</p>
+                                    </td>
+                                    <td className="px-8 py-6">
+                                        <p className="text-sm text-zinc-400 line-clamp-1 italic">"{page.title}"</p>
+                                    </td>
+                                    <td className="px-8 py-6 text-right">
+                                        <div className="flex gap-2 justify-end">
+                                            <button onClick={() => handleEdit(page)} className="p-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-zinc-400 hover:text-white transition-all"><Edit2 size={14} /></button>
+                                            <a 
+                                                href={`${page.type === 'chat' ? '/chat' : '/lp'}/${slugify(page.city)}/${slugify(page.modality)}`} 
+                                                target="_blank"
+                                                className="p-2 bg-zinc-800 hover:bg-amber-500 rounded-lg text-zinc-400 hover:text-black transition-all"
+                                            >
+                                                <ExternalLink size={14} />
+                                            </a>
+                                            <button onClick={() => handleDelete(page)} className="p-2 bg-zinc-800 hover:bg-red-500/20 rounded-lg text-zinc-400 hover:text-red-500 transition-all"><Trash2 size={14} /></button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            )}
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+                <div className="flex justify-center items-center gap-2 mt-12 pb-12">
+                   <button 
+                     disabled={currentPage === 1}
+                     onClick={() => paginate(currentPage - 1)}
+                     className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl disabled:opacity-30 hover:border-amber-500 transition-all"
+                   >
+                     <Layout size={16} className="rotate-180" />
+                   </button>
+                   
+                   {[...Array(totalPages)].map((_, i) => (
+                      <button 
+                        key={i}
+                        onClick={() => paginate(i + 1)}
+                        className={`w-10 h-10 rounded-xl font-bold font-mono text-sm transition-all ${currentPage === i + 1 ? 'bg-amber-500 text-black shadow-lg shadow-amber-500/20' : 'bg-zinc-900 border border-zinc-800 text-zinc-500 hover:border-zinc-700'}`}
+                      >
+                        {i + 1}
+                      </button>
+                   ))}
+
+                   <button 
+                     disabled={currentPage === totalPages}
+                     onClick={() => paginate(currentPage + 1)}
+                     className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl disabled:opacity-30 hover:border-amber-500 transition-all"
+                   >
+                     <Layout size={16} />
+                   </button>
+                </div>
+            )}
+
           </div>
         ) : activeTab === 'leads' ? (
           <div className="space-y-6">
@@ -1361,8 +1484,9 @@ export default function AdminPanel() {
                          )}
                       </section>
 
-                      {/* Content */}
-                      <div className="space-y-8">
+                    {/* Content */}
+                    <div className="space-y-8">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                         <div className="space-y-2">
                           <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">Título da Página (Impacto)</label>
                           <input 
@@ -1373,15 +1497,160 @@ export default function AdminPanel() {
                           />
                         </div>
                         <div className="space-y-2">
-                          <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">Texto de Venda / Subtítulo</label>
-                          <textarea 
-                            rows={4}
+                          <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">Subtítulo do Hero</label>
+                          <input 
+                            type="text" 
                             className="w-full bg-zinc-900/50 border border-zinc-800 rounded-2xl px-6 py-4 outline-none focus:border-amber-500 transition-all font-medium text-zinc-400"
-                            value={editingPage?.description}
-                            onChange={e => setEditingPage({...editingPage, description: e.target.value})}
+                            value={editingPage?.heroSubtitle || ''}
+                            onChange={e => setEditingPage({...editingPage, heroSubtitle: e.target.value})}
+                            placeholder="Transforme sua vida através do Jiu-Jitsu..."
                           />
                         </div>
                       </div>
+                      <div className="space-y-2">
+                        <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">Parágrafo de Venda / Descrição Meta</label>
+                        <textarea 
+                          rows={4}
+                          className="w-full bg-zinc-900/50 border border-zinc-800 rounded-2xl px-6 py-4 outline-none focus:border-amber-500 transition-all font-medium text-zinc-400"
+                          value={editingPage?.description}
+                          onChange={e => setEditingPage({...editingPage, description: e.target.value})}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Section Titles Customization */}
+                    <section className="p-8 bg-amber-500/5 border border-amber-500/10 rounded-[32px] space-y-8">
+                       <h3 className="text-xs font-black uppercase tracking-widest text-amber-500">Personalização de Seções</h3>
+                       
+                       <div className="space-y-6">
+                          <div className="flex items-center justify-between">
+                            <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">Mini Cards / Stats (Hero)</label>
+                            <button 
+                              onClick={() => {
+                                const h = editingPage?.heroStats || [];
+                                setEditingPage({ ...editingPage, heroStats: [...h, { value: '', label: '' }] });
+                              }}
+                              className="text-[10px] font-black uppercase text-amber-500 hover:text-amber-400"
+                            >
+                              + Adicionar Card
+                            </button>
+                          </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                             {editingPage?.heroStats?.map((stat, i) => (
+                               <div key={i} className="bg-black/40 p-4 rounded-2xl border border-zinc-800 space-y-2 relative group">
+                                  <button 
+                                    onClick={() => {
+                                      const h = [...(editingPage.heroStats || [])];
+                                      h.splice(i, 1);
+                                      setEditingPage({ ...editingPage, heroStats: h });
+                                    }}
+                                    className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all shadow-lg"
+                                  >
+                                    <X size={12} />
+                                  </button>
+                                  <input 
+                                    placeholder="Valor (ex: +500)" 
+                                    className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-1 text-xs font-black text-amber-500"
+                                    value={stat.value}
+                                    onChange={e => {
+                                      const h = [...(editingPage.heroStats || [])];
+                                      h[i].value = e.target.value;
+                                      setEditingPage({ ...editingPage, heroStats: h });
+                                    }}
+                                  />
+                                  <input 
+                                    placeholder="Selo (ex: Alunos)" 
+                                    className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-1 text-[10px] font-bold uppercase"
+                                    value={stat.label}
+                                    onChange={e => {
+                                      const h = [...(editingPage.heroStats || [])];
+                                      h[i].label = e.target.value;
+                                      setEditingPage({ ...editingPage, heroStats: h });
+                                    }}
+                                  />
+                               </div>
+                             ))}
+                          </div>
+                       </div>
+
+                       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-6 border-t border-zinc-800/50">
+                          <div className="space-y-2">
+                             <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">Título do Formulário</label>
+                             <input 
+                               type="text" 
+                               className="w-full bg-black/40 border border-zinc-800 rounded-2xl px-6 py-4 outline-none focus:border-amber-500 text-xs font-bold"
+                               value={editingPage?.formTitle || ''}
+                               onChange={e => setEditingPage({ ...editingPage, formTitle: e.target.value })}
+                               placeholder="Inicie sua Jornada"
+                             />
+                          </div>
+                          <div className="space-y-2">
+                             <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">Selo do Formulário (Badge)</label>
+                             <input 
+                               type="text" 
+                               className="w-full bg-black/40 border border-zinc-800 rounded-2xl px-6 py-4 outline-none focus:border-amber-500 text-xs font-bold"
+                               value={editingPage?.formBadge || ''}
+                               onChange={e => setEditingPage({ ...editingPage, formBadge: e.target.value })}
+                               placeholder="AULA GRÁTIS"
+                             />
+                          </div>
+                          <div className="space-y-2">
+                             <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">Título da Seção de Vídeo</label>
+                             <input 
+                               type="text" 
+                               className="w-full bg-black/40 border border-zinc-800 rounded-2xl px-6 py-4 outline-none focus:border-amber-500 text-xs font-bold"
+                               value={editingPage?.sectionVideoTitle || ''}
+                               onChange={e => setEditingPage({ ...editingPage, sectionVideoTitle: e.target.value })}
+                               placeholder="O Caminho do Guerreiro"
+                             />
+                          </div>
+                          <div className="space-y-2">
+                             <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">Título de Depoimentos</label>
+                             <input 
+                               type="text" 
+                               className="w-full bg-black/40 border border-zinc-800 rounded-2xl px-6 py-4 outline-none focus:border-amber-500 text-xs font-bold"
+                               value={editingPage?.sectionTestimonialsTitle || ''}
+                               onChange={e => setEditingPage({ ...editingPage, sectionTestimonialsTitle: e.target.value })}
+                               placeholder="DOJO TALK"
+                             />
+                          </div>
+                       </div>
+
+                       <div className="space-y-6 pt-4 border-t border-zinc-800/50">
+                          <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-amber-500">Seção Galeria / QG</label>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                             <div className="space-y-2">
+                                <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">Subtítulo Pequeno</label>
+                                <input 
+                                  type="text" 
+                                  className="w-full bg-black/40 border border-zinc-800 rounded-2xl px-6 py-4 outline-none focus:border-amber-500 text-xs font-bold"
+                                  value={editingPage?.sectionImagesSubtitle || ''}
+                                  onChange={e => setEditingPage({ ...editingPage, sectionImagesSubtitle: e.target.value })}
+                                  placeholder="A Academia"
+                                />
+                             </div>
+                             <div className="space-y-2">
+                                <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">Título Grande</label>
+                                <input 
+                                  type="text" 
+                                  className="w-full bg-black/40 border border-zinc-800 rounded-2xl px-6 py-4 outline-none focus:border-amber-500 text-xs font-bold"
+                                  value={editingPage?.sectionImagesTitle || ''}
+                                  onChange={e => setEditingPage({ ...editingPage, sectionImagesTitle: e.target.value })}
+                                  placeholder="NOSSO QG"
+                                />
+                             </div>
+                          </div>
+                          <div className="space-y-2">
+                             <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">Descrição da Galeria</label>
+                             <textarea 
+                               className="w-full bg-black/40 border border-zinc-800 rounded-2xl px-6 py-4 outline-none focus:border-amber-500 text-xs"
+                               value={editingPage?.sectionImagesDescription || ''}
+                               onChange={e => setEditingPage({ ...editingPage, sectionImagesDescription: e.target.value })}
+                               placeholder="Estrutura premium focada na alta performance..."
+                             />
+                          </div>
+                       </div>
+                    </section>
 
                       {/* Action Settings */}
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -1612,8 +1881,8 @@ export default function AdminPanel() {
             >
               <h3 className="text-xl font-bold">Qual exemplo criar?</h3>
               <div className="grid gap-3">
-                <button onClick={seedDemo} className="w-full py-4 bg-blue-600 hover:bg-blue-500 rounded-2xl font-bold uppercase tracking-widest text-[10px]">1. Chat Flow (Interativo)</button>
-                <button onClick={seedDemoLP} className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 rounded-2xl font-bold uppercase tracking-widest text-[10px]">2. Landing Page (Clássico)</button>
+                <button onClick={seedDemo} className="w-full py-4 bg-blue-600/50 hover:bg-blue-600 rounded-2xl font-bold uppercase tracking-widest text-[10px]">1. Chat Flow (Exemplo)</button>
+                <button onClick={seedDemoLP} className="w-full py-4 bg-emerald-600/50 hover:bg-emerald-600 rounded-2xl font-bold uppercase tracking-widest text-[10px]">2. Landing Page (Exemplo)</button>
               </div>
               <button onClick={() => setShowSeedChoice(false)} className="w-full py-2 text-zinc-500 font-bold uppercase tracking-widest text-[10px]">Cancelar</button>
             </motion.div>

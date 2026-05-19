@@ -327,7 +327,12 @@ export default function LandingPage() {
       >
         <div className="flex items-center gap-3">
           {config.logoUrl ? (
-            <img src={config.logoUrl} alt={config.academyName} className="h-10 md:h-12 w-auto max-w-[150px] md:max-w-[200px] object-contain" referrerPolicy="no-referrer" />
+            <img 
+              src={config.logoUrl} 
+              alt={config.academyName} 
+              className="w-auto max-w-[140px] md:max-w-[180px] max-h-[40px] md:max-h-[50px] object-contain" 
+              referrerPolicy="no-referrer" 
+            />
           ) : (
             <div className="w-10 h-10 flex items-center justify-center rounded-lg rotate-3 shadow-lg" style={{ backgroundColor: primaryColor }}>
               <span className="text-black font-black text-xl italic font-display">BJJ</span>
@@ -368,7 +373,7 @@ export default function LandingPage() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.1 }}
-              className="text-6xl md:text-8xl font-black leading-[0.9] tracking-tighter font-display"
+              className="text-3xl md:text-5xl font-black leading-[0.9] tracking-tighter font-display max-w-xl"
             >
               {config.title.split(' ').map((word, i) => (
                 <span key={i} className={i % 3 === 2 ? "italic block mt-2 opacity-90" : "block"}>
@@ -383,7 +388,9 @@ export default function LandingPage() {
               transition={{ delay: 0.2 }}
               className="text-lg md:text-xl opacity-60 max-w-lg leading-relaxed"
             >
-              Transforme sua vida através do <span className="font-semibold underline underline-offset-4" style={{ textDecorationColor: primaryColor }}>{config.modality}</span>. Disciplina, técnica e comunidade em {config.city}.
+              {config.heroSubtitle ? config.heroSubtitle : (
+                <>Transforme sua vida através do <span className="font-semibold underline underline-offset-4" style={{ textDecorationColor: primaryColor }}>{config.modality}</span>. Disciplina, técnica e comunidade em {config.city}.</>
+              )}
             </motion.p>
 
             <motion.div 
@@ -417,18 +424,29 @@ export default function LandingPage() {
               transition={{ delay: 0.4 }}
               className="grid grid-cols-2 md:grid-cols-3 gap-6 pt-12"
             >
-              <div className="bg-zinc-900/40 p-4 rounded-2xl border border-white/5 backdrop-blur-sm">
-                <div className="font-black text-xl mb-1 font-display" style={{ color: primaryColor }}>+500</div>
-                <div className="text-[10px] opacity-40 uppercase tracking-widest font-bold">Alunos Ativos</div>
-              </div>
-              <div className="bg-zinc-900/40 p-4 rounded-2xl border border-white/5 backdrop-blur-sm">
-                <div className="font-black text-xl mb-1 font-display" style={{ color: primaryColor }}>100%</div>
-                <div className="text-[10px] opacity-40 uppercase tracking-widest font-bold">Black Belts</div>
-              </div>
-              <div className="bg-zinc-900/40 p-4 rounded-2xl border border-white/5 backdrop-blur-sm hidden md:block">
-                <div className="font-black text-xl mb-1 font-display" style={{ color: primaryColor }}>24/7</div>
-                <div className="text-[10px] opacity-40 uppercase tracking-widest font-bold">Vagas Limitadas</div>
-              </div>
+              {(config.heroStats && config.heroStats.length > 0) ? (
+                config.heroStats.map((stat, i) => (
+                  <div key={i} className="bg-zinc-900/40 p-4 rounded-2xl border border-white/5 backdrop-blur-sm">
+                    <div className="font-black text-xl mb-1 font-display" style={{ color: primaryColor }}>{stat.value}</div>
+                    <div className="text-[10px] opacity-40 uppercase tracking-widest font-bold">{stat.label}</div>
+                  </div>
+                ))
+              ) : (
+                <>
+                  <div className="bg-zinc-900/40 p-4 rounded-2xl border border-white/5 backdrop-blur-sm">
+                    <div className="font-black text-xl mb-1 font-display" style={{ color: primaryColor }}>+500</div>
+                    <div className="text-[10px] opacity-40 uppercase tracking-widest font-bold">Alunos Ativos</div>
+                  </div>
+                  <div className="bg-zinc-900/40 p-4 rounded-2xl border border-white/5 backdrop-blur-sm">
+                    <div className="font-black text-xl mb-1 font-display" style={{ color: primaryColor }}>100%</div>
+                    <div className="text-[10px] opacity-40 uppercase tracking-widest font-bold">Black Belts</div>
+                  </div>
+                  <div className="bg-zinc-900/40 p-4 rounded-2xl border border-white/5 backdrop-blur-sm hidden md:block">
+                    <div className="font-black text-xl mb-1 font-display" style={{ color: primaryColor }}>24/7</div>
+                    <div className="text-[10px] opacity-40 uppercase tracking-widest font-bold">Vagas Limitadas</div>
+                  </div>
+                </>
+              )}
             </motion.div>
           </div>
 
@@ -443,7 +461,7 @@ export default function LandingPage() {
                 className="bg-zinc-900 border border-zinc-800 p-8 md:p-10 rounded-[32px] shadow-2xl relative"
               >
                 <div className="absolute -top-4 -right-4 text-black font-black px-4 py-2 rounded-lg -rotate-12 shadow-lg text-sm z-10" style={{ backgroundColor: primaryColor }}>
-                  AULA GRÁTIS
+                  {config.formBadge || 'AULA GRÁTIS'}
                 </div>
                 
                 <AnimatePresence mode="wait">
@@ -466,7 +484,7 @@ export default function LandingPage() {
                     </motion.div>
                   ) : (
                     <motion.div key="form">
-                      <h3 className="text-2xl font-bold mb-8 text-center">Inicie sua <span className="italic" style={{ color: 'var(--primary)' }}>Jornada</span></h3>
+                      <h3 className="text-2xl font-bold mb-8 text-center">{config.formTitle || <>Inicie sua <span className="italic" style={{ color: 'var(--primary)' }}>Jornada</span></>}</h3>
                       <form onSubmit={handleSubmit} className="space-y-5">
                         <div className="space-y-1.5">
                           <label className="block text-[10px] uppercase tracking-widest text-zinc-500 font-black">Seu Nome</label>
@@ -541,7 +559,11 @@ export default function LandingPage() {
         {config.videoUrl && (
           <section className="py-24 px-6 bg-zinc-950/80 border-y border-white/5">
             <div className="max-w-5xl mx-auto">
-              <h3 className="text-3xl font-black mb-12 text-center uppercase tracking-tighter">O Caminho do <span className="italic" style={{ color: primaryColor }}>Guerreiro</span></h3>
+              <h3 className="text-3xl font-black mb-12 text-center uppercase tracking-tighter">
+                {config.sectionVideoTitle ? config.sectionVideoTitle : (
+                  <>O Caminho do <span className="italic" style={{ color: primaryColor }}>Guerreiro</span></>
+                )}
+              </h3>
               <motion.div 
                 whileInView={{ opacity: 1, scale: 1 }}
                 initial={{ opacity: 0, scale: 0.95 }}
@@ -565,10 +587,16 @@ export default function LandingPage() {
             <div className="max-w-6xl mx-auto">
               <div className="flex flex-col md:flex-row md:items-end justify-between mb-16 gap-6">
                 <div>
-                  <span className="font-bold uppercase tracking-[0.2em] text-xs" style={{ color: primaryColor }}>A Academia</span>
-                  <h2 className="text-5xl font-black tracking-tighter mt-2 font-display">NOSSO <span className="text-zinc-700 italic">QG</span></h2>
+                  <span className="font-bold uppercase tracking-[0.2em] text-xs" style={{ color: primaryColor }}>{config.sectionImagesSubtitle || 'A Academia'}</span>
+                  <h2 className="text-5xl font-black tracking-tighter mt-2 font-display">
+                    {config.sectionImagesTitle ? config.sectionImagesTitle : (
+                      <>NOSSO <span className="text-zinc-700 italic">QG</span></>
+                    )}
+                  </h2>
                 </div>
-                <p className="text-zinc-500 max-w-sm text-sm pl-4 italic border-l-2" style={{ borderLeftColor: `${primaryColor}4D` }}>Estrutura premium focada na alta performance e segurança de nossos alunos.</p>
+                <p className="text-zinc-500 max-w-sm text-sm pl-4 italic border-l-2" style={{ borderLeftColor: `${primaryColor}4D` }}>
+                  {config.sectionImagesDescription || 'Estrutura premium focada na alta performance e segurança de nossos alunos.'}
+                </p>
               </div>
               
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -593,7 +621,7 @@ export default function LandingPage() {
             <div className="max-w-4xl mx-auto">
               <h2 className="text-3xl font-black mb-20 text-center italic uppercase tracking-[0.3em] flex items-center justify-center gap-6">
                 <div className="h-px bg-zinc-800 flex-1 hidden md:block"></div>
-                <Star style={{ color: primaryColor, fill: primaryColor }} size={20} /> DOJO TALK <Star style={{ color: primaryColor, fill: primaryColor }} size={20} />
+                <Star style={{ color: primaryColor, fill: primaryColor }} size={20} /> {config.sectionTestimonialsTitle || 'DOJO TALK'} <Star style={{ color: primaryColor, fill: primaryColor }} size={20} />
                 <div className="h-px bg-zinc-800 flex-1 hidden md:block"></div>
               </h2>
               <div className="grid gap-12">
