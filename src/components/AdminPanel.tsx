@@ -3,17 +3,21 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { collection, onSnapshot, addDoc, updateDoc, doc, deleteDoc, query, orderBy } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
+import { THEMES } from '../themes';
+
 import { auth, db } from '../lib/firebase';
 import { LandingPageConfig, Lead, Testimonial, ChatConfig, ChatStep, PageType } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Plus, Layout, Users, Trash2, Edit2, ExternalLink, Save, X, 
   PlusCircle, Trash, Copy, Sparkles, Server, Settings, LogOut, 
-  MessageSquare, Image as ImageIcon, List, Film, CheckCircle2, ChevronDown, ChevronUp, GripVertical, Info
+  MessageSquare, Image as ImageIcon, List, Film, CheckCircle2, ChevronDown, ChevronUp, GripVertical, Info, Eye, Search, History, Upload, Grid
 } from 'lucide-react';
+import ReactCrop, { type Crop, centerCrop, makeAspectCrop } from 'react-image-crop';
+import 'react-image-crop/dist/ReactCrop.css';
 
 const slugify = (text: string) => {
   return text
@@ -25,6 +29,251 @@ const slugify = (text: string) => {
     .replace(/[^a-z0-9 -]/g, '')         // remove non-alphanumeric characters
     .replace(/\s+/g, '-')                // replace spaces with hyphens
     .replace(/-+/g, '-');                // remove consecutive hyphens
+};
+
+const ImageManager = ({ isOpen, onClose, onSelect }: { isOpen: boolean; onClose: () => void; onSelect: (url: string) => void }) => {
+  const [tab, setTab] = useState<'upload' | 'gallery'>('upload');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [crop, setCrop] = useState<Crop>();
+  const [completedCrop, setCompletedCrop] = useState<Crop | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [gallery, setGallery] = useState<{name: string, url: string}[]>([]);
+  const imgRef = useRef<HTMLImageElement>(null);
+
+  useEffect(() => {
+    if (isOpen && tab === 'gallery') {
+      fetchGallery();
+    }
+  }, [isOpen, tab]);
+
+  const fetchGallery = async () => {
+    try {
+      const res = await fetch('/api/media');
+      const data = await res.json();
+      setGallery(data);
+    } catch (err) {
+      console.error("Gallery fetch error:", err);
+    }
+  };
+
+  const onFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      const file = e.target.files[0];
+      if (!file.type.startsWith('image/')) {
+        alert('Por favor, selecione apenas imagens.');
+        return;
+      }
+      setSelectedFile(file);
+      const reader = new FileReader();
+      reader.addEventListener('load', () => setPreviewUrl(reader.result?.toString() || null));
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const onImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
+    const { width, height } = e.currentTarget;
+    setCrop(centerCrop(makeAspectCrop({ unit: '%', width: 90 }, 1, width, height), width, height));
+  };
+
+  const handleUpload = async () => {
+    if (!selectedFile) return;
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append('image', selectedFile);
+      if (completedCrop) {
+        formData.append('crop', JSON.stringify(completedCrop));
+      }
+
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      });
+      const data = await res.json();
+      if (data.url) {
+        onSelect(data.url);
+        onClose();
+      }
+    } catch (err) {
+      console.error("Upload error:", err);
+      alert("Erro ao enviar imagem.");
+    } finally {
+       setUploading(false);
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md">
+      <motion.div 
+        initial={{ scale: 0.9, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        className="bg-zinc-900 border border-zinc-800 w-full max-w-4xl max-h-[90vh] rounded-[40px] overflow-hidden flex flex-col"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="p-6 border-b border-zinc-800 flex items-center justify-between">
+           <div className="flex gap-4">
+              <button 
+                onClick={() => setTab('upload')}
+                className={`px-6 py-2 rounded-full text-xs font-black uppercase tracking-widest transition-all ${tab === 'upload' ? 'bg-amber-500 text-black' : 'text-zinc-500 hover:text-white'}`}
+              >
+                Upload
+              </button>
+              <button 
+                onClick={() => setTab('gallery')}
+                className={`px-6 py-2 rounded-full text-xs font-black uppercase tracking-widest transition-all ${tab === 'gallery' ? 'bg-amber-500 text-black' : 'text-zinc-500 hover:text-white'}`}
+              >
+                Galeria
+              </button>
+           </div>
+           <button onClick={onClose} className="p-2 bg-zinc-800 hover:bg-zinc-700 rounded-full text-zinc-500 hover:text-white">
+              <X size={20} />
+           </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-8">
+           {tab === 'upload' ? (
+              <div className="h-full flex flex-col items-center justify-center space-y-6">
+                 {!previewUrl ? (
+                   <label className="w-full max-w-sm aspect-video border-2 border-dashed border-zinc-800 rounded-[32px] flex flex-col items-center justify-center gap-4 cursor-pointer hover:border-amber-500/50 hover:bg-amber-500/5 transition-all group">
+                      <div className="w-16 h-16 bg-zinc-800 rounded-full flex items-center justify-center group-hover:scale-110 transition-all">
+                         <Upload size={24} className="text-zinc-500 group-hover:text-amber-500" />
+                      </div>
+                      <div className="text-center">
+                         <p className="text-sm font-bold">Clique para selecionar</p>
+                         <p className="text-[10px] text-zinc-500 uppercase tracking-widest mt-1">Imagens até 5MB</p>
+                      </div>
+                      <input type="file" className="hidden" accept="image/*" onChange={onFileSelect} />
+                   </label>
+                 ) : (
+                   <div className="w-full space-y-6">
+                      <div className="max-h-[50vh] overflow-hidden rounded-2xl flex justify-center bg-black/40 p-4">
+                        <ReactCrop
+                          crop={crop}
+                          onChange={c => setCrop(c)}
+                          onComplete={c => setCompletedCrop(c)}
+                        >
+                          <img 
+                            ref={imgRef}
+                            src={previewUrl} 
+                            style={{ maxHeight: '45vh' }} 
+                            onLoad={onImageLoad}
+                          />
+                        </ReactCrop>
+                      </div>
+                      <div className="flex gap-4 justify-center">
+                         <button 
+                           onClick={() => { setPreviewUrl(null); setSelectedFile(null); }}
+                           className="px-8 py-4 bg-zinc-800 rounded-2xl font-bold uppercase tracking-widest text-[10px] hover:bg-zinc-700"
+                         >
+                            Trocar Imagem
+                         </button>
+                         <button 
+                           onClick={handleUpload}
+                           disabled={uploading}
+                           className="px-12 py-4 bg-amber-500 text-black rounded-2xl font-bold uppercase tracking-widest text-[10px] hover:bg-amber-400 disabled:opacity-50 flex items-center gap-2"
+                         >
+                            {uploading ? 'Processando...' : 'Cortar e Salvar'}
+                            <Save size={16} />
+                         </button>
+                      </div>
+                   </div>
+                 )}
+              </div>
+           ) : (
+              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                 {gallery.map((img, i) => (
+                    <div 
+                      key={i} 
+                      onClick={() => { onSelect(img.url); onClose(); }}
+                      className="aspect-square bg-black/50 rounded-2xl overflow-hidden border border-zinc-800 cursor-pointer group hover:border-amber-500 transition-all relative"
+                    >
+                       <img src={img.url} className="w-full h-full object-cover group-hover:scale-110 transition-all" />
+                       <div className="absolute inset-0 bg-amber-500/20 opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center">
+                          <Plus className="text-white" size={32} />
+                       </div>
+                    </div>
+                 ))}
+                 {gallery.length === 0 && (
+                    <div className="col-span-full py-20 text-center text-zinc-600 font-bold uppercase tracking-[0.2em] text-[10px]">
+                       Galeria vazia... Faça um upload primeiro.
+                    </div>
+                 )}
+              </div>
+           )}
+        </div>
+      </motion.div>
+    </div>
+  );
+};
+
+const UrlInput = ({ label, value, onChange, placeholder, type = 'text' }: { label: string; value: string; onChange: (val: string) => void; placeholder?: string; type?: string }) => {
+  const [showPreview, setShowPreview] = useState(false);
+  const [showManager, setShowManager] = useState(false);
+  const isImage = value && (value.match(/\.(jpeg|jpg|gif|png|webp|svg)/i) || value.includes('images.unsplash.com') || value.startsWith('/uploads/'));
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">{label}</label>
+        <div className="flex gap-4">
+           {isImage && (
+             <button 
+               onClick={() => setShowPreview(true)}
+               className="text-[10px] font-black uppercase text-amber-500 hover:text-amber-400 transition-all flex items-center gap-1"
+             >
+               <Eye size={12} /> Preview
+             </button>
+           )}
+           <button 
+             onClick={() => setShowManager(true)}
+             className="text-[10px] font-black uppercase text-zinc-500 hover:text-white transition-all flex items-center gap-1"
+           >
+             <Upload size={12} /> Upload / Galeria
+           </button>
+        </div>
+      </div>
+      <div className="relative">
+        <input 
+          type={type} 
+          className="w-full bg-black/40 border border-zinc-800 rounded-2xl px-6 py-4 outline-none focus:border-amber-500 transition-all text-xs"
+          value={value || ''}
+          onChange={e => onChange(e.target.value)}
+          placeholder={placeholder || "https://..."}
+        />
+      </div>
+
+      <ImageManager 
+        isOpen={showManager} 
+        onClose={() => setShowManager(false)} 
+        onSelect={onChange} 
+      />
+
+      <AnimatePresence>
+        {showPreview && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md" onClick={() => setShowPreview(false)}>
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="relative max-w-4xl max-h-[80vh] bg-zinc-900 p-2 rounded-3xl overflow-hidden border border-zinc-800"
+              onClick={e => e.stopPropagation()}
+            >
+              <img src={value} alt="Preview" className="max-w-full max-h-[75vh] object-contain rounded-2xl" referrerPolicy="no-referrer" />
+              <button 
+                onClick={() => setShowPreview(false)}
+                className="absolute top-4 right-4 p-2 bg-black/50 hover:bg-black rounded-full"
+              >
+                <X size={20} />
+              </button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
 };
 
 const ChatFlowEditor = ({ config, onChange, onUpdatePage }: { config: ChatConfig; onChange: (c: ChatConfig) => void; onUpdatePage: (p: any) => void }) => {
@@ -58,24 +307,16 @@ const ChatFlowEditor = ({ config, onChange, onUpdatePage }: { config: ChatConfig
               placeholder="Ex: Mestre Helio"
             />
           </div>
-          <div className="space-y-2">
-            <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">Foto do Contato (URL)</label>
-            <input 
-              type="text" 
-              className="w-full bg-black/40 border border-zinc-800 rounded-2xl px-6 py-4 outline-none focus:border-amber-500 transition-all text-xs"
-              value={config?.contactPhotoUrl || ''}
-              onChange={e => onChange({...config, contactPhotoUrl: e.target.value})}
-              placeholder="https://..."
-            />
-          </div>
+          <UrlInput 
+            label="Foto do Contato (URL)"
+            value={config?.contactPhotoUrl || ''}
+            onChange={v => onChange({...config, contactPhotoUrl: v})}
+          />
           <div className="space-y-2 md:col-span-2">
-            <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">Imagem de Fundo do Chat (URL)</label>
-            <input 
-              type="text" 
-              className="w-full bg-black/40 border border-zinc-800 rounded-2xl px-6 py-4 outline-none focus:border-amber-500 transition-all text-xs"
+            <UrlInput 
+              label="Imagem de Fundo do Chat (URL)"
               value={config?.backgroundImageUrl || ''}
-              onChange={e => onChange({...config, backgroundImageUrl: e.target.value})}
-              placeholder="https://..."
+              onChange={v => onChange({...config, backgroundImageUrl: v})}
             />
           </div>
        </div>
@@ -100,7 +341,7 @@ const ChatFlowEditor = ({ config, onChange, onUpdatePage }: { config: ChatConfig
                     </button>
                  </div>
                  <div className="p-8 space-y-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                        <div className="space-y-2">
                           <label className="block text-[10px] font-black uppercase tracking-widest text-zinc-500 ml-2">Tipo de Mensagem</label>
                           <select 
@@ -113,12 +354,26 @@ const ChatFlowEditor = ({ config, onChange, onUpdatePage }: { config: ChatConfig
                              <option value="image_options">Grade com Imagens</option>
                              <option value="listbox">Lista de Seleção</option>
                              <option value="media">Áudio / Vídeo (AutoPlay)</option>
+                             <option value="link">Link Externo / Botão Único</option>
                           </select>
                        </div>
                        <div className="space-y-2">
-                          <label className="block text-[10px] font-black uppercase tracking-widest text-zinc-500 ml-2">Próximo Passo (Sequencial por padrão)</label>
+                          <label className="block text-[10px] font-black uppercase tracking-widest text-zinc-500 ml-2">Validação / Campo</label>
+                          <select 
+                            className="w-full bg-black/40 border border-zinc-800 rounded-2xl px-6 py-4 outline-none focus:border-amber-500 text-xs font-bold appearance-none cursor-pointer"
+                            value={step.validationType || 'none'}
+                            onChange={e => updateStep(idx, { ...step, validationType: e.target.value as any })}
+                          >
+                             <option value="none">Nenhuma (Livre)</option>
+                             <option value="name">Nome do Cliente</option>
+                             <option value="email">E-mail</option>
+                             <option value="phone">WhatsApp / Celular</option>
+                          </select>
+                       </div>
+                       <div className="space-y-2">
+                          <label className="block text-[10px] font-black uppercase tracking-widest text-zinc-500 ml-2">Próximo Passo</label>
                           <input 
-                            placeholder="ID do passo (opcional)" 
+                            placeholder="ID do passo" 
                             className="w-full bg-black/40 border border-zinc-800 rounded-2xl px-6 py-4 outline-none focus:border-amber-500 text-xs font-mono"
                             value={step.nextStepId || ''}
                             onChange={e => updateStep(idx, { ...step, nextStepId: e.target.value })}
@@ -151,13 +406,17 @@ const ChatFlowEditor = ({ config, onChange, onUpdatePage }: { config: ChatConfig
                                   }} />
                                   <div className="flex gap-2">
                                      {step.type === 'image_options' && (
-                                       <input placeholder="URL Img" className="flex-1 bg-black/45 border border-zinc-800 rounded-xl px-4 py-2 text-xs" value={opt.imageUrl || ''} onChange={e => {
-                                         const no = [...(step.options || [])]; no[optIdx].imageUrl = e.target.value; updateStep(idx, { ...step, options: no });
-                                       }} />
+                                       <UrlInput 
+                                          label="Img"
+                                          value={opt.imageUrl || ''}
+                                          onChange={v => {
+                                            const no = [...(step.options || [])]; no[optIdx].imageUrl = v; updateStep(idx, { ...step, options: no });
+                                          }}
+                                       />
                                      )}
                                      <button onClick={() => {
                                        const no = [...(step.options || [])]; no.splice(optIdx, 1); updateStep(idx, { ...step, options: no });
-                                     }} className="p-2 text-zinc-700 hover:text-red-500"><Trash size={14} /></button>
+                                     }} className="p-2 text-zinc-700 hover:text-red-500 self-end mb-4"><Trash size={14} /></button>
                                   </div>
                                </div>
                              ))}
@@ -176,10 +435,32 @@ const ChatFlowEditor = ({ config, onChange, onUpdatePage }: { config: ChatConfig
                                 <option value="audio">Áudio</option>
                              </select>
                           </div>
+                          <UrlInput 
+                              label="URL do Arquivo"
+                              value={step.mediaUrl || ''}
+                              onChange={v => updateStep(idx, { ...step, mediaUrl: v })}
+                              placeholder="https://..."
+                           />
+                       </div>
+                    )}
+                    {step.type === 'link' && (
+                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-zinc-900">
                           <div className="space-y-2">
-                             <label className="block text-[10px] font-black uppercase tracking-widest text-zinc-500 ml-2">URL do Arquivo</label>
-                             <input className="w-full bg-black/40 border border-zinc-800 rounded-2xl px-6 py-4 outline-none focus:border-amber-500 text-xs font-mono" value={step.mediaUrl || ''} onChange={e => updateStep(idx, { ...step, mediaUrl: e.target.value })} placeholder="https://..." />
+                             <label className="block text-[10px] font-black uppercase tracking-widest text-zinc-500 ml-2">Rótulo do Botão</label>
+                             <input 
+                               type="text" 
+                               className="w-full bg-black/40 border border-zinc-800 rounded-2xl px-6 py-4 outline-none focus:border-amber-500 text-xs font-bold"
+                               value={step.linkLabel || ''}
+                               onChange={e => updateStep(idx, { ...step, linkLabel: e.target.value })}
+                               placeholder="Ex: Abrir Site"
+                             />
                           </div>
+                          <UrlInput 
+                              label="URL do Link"
+                              value={step.linkUrl || ''}
+                              onChange={v => updateStep(idx, { ...step, linkUrl: v })}
+                              placeholder="https://..."
+                           />
                        </div>
                     )}
                  </div>
@@ -198,10 +479,29 @@ export default function AdminPanel() {
   const [isEditing, setIsEditing] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [editingPage, setEditingPage] = useState<Partial<LandingPageConfig> | null>(null);
+  const [originalPage, setOriginalPage] = useState<string | null>(null);
   const [pageToDelete, setPageToDelete] = useState<LandingPageConfig | null>(null);
+  const [showUnsavedModal, setShowUnsavedModal] = useState(false);
+  const [showSlugWarning, setShowSlugWarning] = useState(false);
   const [deleteCaptcha, setDeleteCaptcha] = useState('');
   const [mathCaptcha, setMathCaptcha] = useState({ a: 0, b: 0, sum: 0 });
   const [showSeedChoice, setShowSeedChoice] = useState(false);
+  const [searchLeads, setSearchLeads] = useState('');
+  const [viewingLead, setViewingLead] = useState<Lead | null>(null);
+
+  const hasUnsavedChanges = () => {
+    if (!editingPage) return false;
+    return JSON.stringify(editingPage) !== originalPage;
+  };
+
+  const handleCloseEditor = () => {
+    if (hasUnsavedChanges()) {
+      setShowUnsavedModal(true);
+    } else {
+      setIsEditing(false);
+      setEditingPage(null);
+    }
+  };
 
   const generateMathCaptcha = () => {
     const a = Math.floor(Math.random() * 9) + 1;
@@ -353,7 +653,7 @@ export default function AdminPanel() {
   }, []);
 
   const handleCreateNew = () => {
-    setEditingPage({
+    const page: Partial<LandingPageConfig> = {
       type: 'lp',
       academyName: 'Dojô Central',
       logoUrl: '',
@@ -378,7 +678,15 @@ export default function AdminPanel() {
           { id: '1', type: 'text', message: 'Olá! Qual o seu nome?' }
         ]
       }
-    });
+    };
+    setEditingPage(page);
+    setOriginalPage(JSON.stringify(page));
+    setIsEditing(true);
+  };
+
+  const handleEdit = (page: LandingPageConfig) => {
+    setEditingPage(page);
+    setOriginalPage(JSON.stringify(page));
     setIsEditing(true);
   };
 
@@ -388,11 +696,23 @@ export default function AdminPanel() {
       return;
     }
 
-    const type = editingPage.type || 'lp';
-    const slug = `${slugify(editingPage.city)}-${slugify(editingPage.modality)}`;
+    const slug = editingPage.slug || `${slugify(editingPage.city)}-${slugify(editingPage.modality)}`;
+    
+    // Safety check for slug change
+    const isNew = !editingPage.id;
+    const oldPage = isNew ? null : pages.find(p => p.id === editingPage.id);
+    const slugChanged = oldPage && oldPage.slug !== slug;
+    
+    if (slugChanged && !showSlugWarning) {
+      const pageLeads = leads.filter(l => l.city === oldPage.city && l.modality === oldPage.modality);
+      if (pageLeads.length > 0) {
+        setShowSlugWarning(true);
+        return;
+      }
+    }
+
     const saveData = {
       ...editingPage,
-      type,
       slug,
       updatedAt: new Date().toISOString()
     };
@@ -546,7 +866,7 @@ export default function AdminPanel() {
                         <button onClick={() => handleDuplicate(page)} className="p-2.5 bg-zinc-800 hover:bg-zinc-700 rounded-xl text-zinc-400 hover:text-white transition-all" title="Duplicar">
                           <Copy size={16} />
                         </button>
-                        <button onClick={() => { setEditingPage(page); setIsEditing(true); }} className="p-2.5 bg-zinc-800 hover:bg-zinc-700 rounded-xl text-zinc-400 hover:text-white transition-all" title="Editar">
+                        <button onClick={() => handleEdit(page)} className="p-2.5 bg-zinc-800 hover:bg-zinc-700 rounded-xl text-zinc-400 hover:text-white transition-all" title="Editar">
                           <Edit2 size={16} />
                         </button>
                         <button onClick={() => handleDelete(page)} className="p-2.5 bg-zinc-800 hover:bg-red-500/20 rounded-xl text-zinc-400 hover:text-red-500 transition-all" title="Excluir">
@@ -586,41 +906,80 @@ export default function AdminPanel() {
             </div>
           </div>
         ) : activeTab === 'leads' ? (
-          <div className="bg-zinc-900/30 rounded-[32px] border border-zinc-800 overflow-hidden backdrop-blur-md">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left">
-                <thead>
-                  <tr className="bg-zinc-900/80 border-b border-zinc-800">
-                    <th className="px-8 py-6 font-black text-[10px] uppercase tracking-[0.3em] text-zinc-600">Data</th>
-                    <th className="px-8 py-6 font-black text-[10px] uppercase tracking-[0.3em] text-zinc-600">Nome</th>
-                    <th className="px-8 py-6 font-black text-[10px] uppercase tracking-[0.3em] text-zinc-600">Contato</th>
-                    <th className="px-8 py-6 font-black text-[10px] uppercase tracking-[0.3em] text-zinc-600">Página</th>
-                    <th className="px-8 py-6 font-black text-[10px] uppercase tracking-[0.3em] text-zinc-600">Campanha</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-zinc-800/50">
-                  {leads.map(lead => (
-                    <tr key={lead.id} className="hover:bg-zinc-800/30 transition-colors">
-                      <td className="px-8 py-6 text-xs text-zinc-500 font-mono">
-                        {lead.createdAt?.toDate ? lead.createdAt.toDate().toLocaleDateString() : new Date(lead.createdAt).toLocaleDateString()}
-                      </td>
-                      <td className="px-8 py-6">
-                        <div className="font-bold text-sm">{lead.name}</div>
-                      </td>
-                      <td className="px-8 py-6">
-                        <div className="text-sm font-black text-amber-500">{lead.phone}</div>
-                        <div className="text-[10px] text-zinc-600 uppercase tracking-widest">{lead.email}</div>
-                      </td>
-                      <td className="px-8 py-6">
-                        <div className="inline-block px-2 py-0.5 rounded bg-zinc-800 text-[10px] font-black uppercase tracking-widest border border-zinc-700">{lead.modality}</div>
-                        <div className="text-[10px] text-zinc-500 mt-1">{lead.city}</div>
-                      </td>
-                      <td className="px-8 py-6">
-                        <span className="text-[10px] font-mono bg-zinc-950 px-2.5 py-1.5 rounded border border-zinc-800 text-zinc-500 uppercase">{lead.campaignCode || 'direto'}</span>
-                      </td>
+          <div className="space-y-6">
+            <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
+               <div className="relative w-full md:max-w-md">
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" size={18} />
+                  <input 
+                    type="text" 
+                    placeholder="Buscar por nome, e-mail ou protocolo..." 
+                    className="w-full bg-zinc-900 border border-zinc-800 rounded-2xl pl-12 pr-6 py-4 outline-none focus:border-amber-500 transition-all text-sm"
+                    value={searchLeads}
+                    onChange={e => setSearchLeads(e.target.value)}
+                  />
+               </div>
+               <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-zinc-600 bg-zinc-900/50 px-4 py-2 rounded-xl border border-zinc-900">
+                  <Users size={14} /> {leads.filter(l => l.name?.toLowerCase().includes(searchLeads.toLowerCase()) || l.protocol?.toLowerCase().includes(searchLeads.toLowerCase())).length} Leads Encontrados
+               </div>
+            </div>
+
+            <div className="bg-zinc-900/30 rounded-[32px] border border-zinc-800 overflow-hidden backdrop-blur-md">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left">
+                  <thead>
+                    <tr className="bg-zinc-900/80 border-b border-zinc-800">
+                      <th className="px-8 py-6 font-black text-[10px] uppercase tracking-[0.3em] text-zinc-600">Protocolo</th>
+                      <th className="px-8 py-6 font-black text-[10px] uppercase tracking-[0.3em] text-zinc-600">Data</th>
+                      <th className="px-8 py-6 font-black text-[10px] uppercase tracking-[0.3em] text-zinc-600">Nome</th>
+                      <th className="px-8 py-6 font-black text-[10px] uppercase tracking-[0.3em] text-zinc-600">Contato</th>
+                      <th className="px-8 py-6 font-black text-[10px] uppercase tracking-[0.3em] text-zinc-600">Página</th>
+                      <th className="px-8 py-6 font-black text-[10px] uppercase tracking-[0.3em] text-zinc-600">Ação</th>
                     </tr>
-                  ))}
-                  {leads.length === 0 && (
+                  </thead>
+                  <tbody className="divide-y divide-zinc-800/50">
+                    {leads
+                      .filter(lead => {
+                        const term = searchLeads.toLowerCase();
+                        return (
+                          lead.name?.toLowerCase().includes(term) ||
+                          lead.protocol?.toLowerCase().includes(term) ||
+                          lead.email?.toLowerCase().includes(term) ||
+                          lead.phone?.toLowerCase().includes(term)
+                        );
+                      })
+                      .map(lead => (
+                      <tr key={lead.id} className="hover:bg-zinc-800/30 transition-colors">
+                        <td className="px-8 py-6">
+                           <span className="text-[10px] font-mono font-bold text-amber-500 bg-amber-500/10 px-3 py-1 rounded-full border border-amber-500/20 whitespace-nowrap">
+                             {lead.protocol || 'LEGADO'}
+                           </span>
+                        </td>
+                        <td className="px-8 py-6 text-[10px] text-zinc-500 font-mono">
+                          {lead.createdAt?.toDate ? lead.createdAt.toDate().toLocaleDateString() : new Date(lead.createdAt).toLocaleDateString()}
+                        </td>
+                        <td className="px-8 py-6">
+                          <div className="font-bold text-sm truncate max-w-[150px]">{lead.name}</div>
+                        </td>
+                        <td className="px-8 py-6">
+                          <div className="text-sm font-black text-amber-500">{lead.phone}</div>
+                          <div className="text-[10px] text-zinc-600 uppercase tracking-widest truncate max-w-[200px]">{lead.email}</div>
+                        </td>
+                        <td className="px-8 py-6">
+                          <div className="inline-block px-2 py-0.5 rounded bg-zinc-800 text-[10px] font-black uppercase tracking-widest border border-zinc-700">{lead.modality}</div>
+                          <div className="text-[10px] text-zinc-500 mt-1">{lead.city}</div>
+                        </td>
+                        <td className="px-8 py-6">
+                          <button 
+                            onClick={() => setViewingLead(lead)}
+                            className="bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 p-2.5 rounded-xl text-zinc-400 hover:text-white transition-all flex items-center justify-center"
+                            title="Ver Conversa"
+                          >
+                            <MessageSquare size={16} />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                    {leads.length === 0 && (
                     <tr>
                       <td colSpan={5} className="px-8 py-32 text-center text-zinc-700 italic font-medium uppercase tracking-widest text-xs">
                         Silêncio no dojô... Nenhum lead ainda.
@@ -631,7 +990,8 @@ export default function AdminPanel() {
               </table>
             </div>
           </div>
-        ) : (
+        </div>
+      ) : (
             <div className="max-w-2xl mx-auto bg-zinc-900/50 p-10 rounded-[40px] border border-zinc-800 space-y-8">
                <div>
                   <h2 className="text-2xl font-bold mb-2">Configurações de Deploy</h2>
@@ -710,7 +1070,7 @@ export default function AdminPanel() {
                   <h2 className="text-3xl font-black italic tracking-tighter uppercase font-display">Setup <span className="text-amber-500">Landing Page</span></h2>
                   <p className="text-[10px] text-zinc-600 uppercase tracking-[0.2em] mt-1">Configuração de Rota e Ativos</p>
                 </div>
-                <button onClick={() => setIsEditing(false)} className="p-3 bg-zinc-900 hover:bg-zinc-800 rounded-full transition-all text-zinc-500 hover:text-white">
+                <button onClick={handleCloseEditor} className="p-3 bg-zinc-900 hover:bg-zinc-800 rounded-full transition-all text-zinc-500 hover:text-white">
                   <X size={24} />
                 </button>
               </div>
@@ -820,40 +1180,49 @@ export default function AdminPanel() {
                       />
                       <p className="text-[9px] text-zinc-500 font-bold uppercase tracking-tighter ml-2">Formato: DDI + DDD + Número (ex: 55 48 99999 9999)</p>
                     </div>
-                    <div className="space-y-2">
-                      <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400">Código de Campanha (Opcional)</label>
-                      <input 
-                        type="text" 
-                        className="w-full bg-black/40 border border-zinc-800 rounded-2xl px-6 py-4 outline-none focus:border-amber-500 transition-all font-mono text-zinc-500"
-                        value={editingPage?.campaignCode}
-                        onChange={e => setEditingPage({...editingPage, campaignCode: e.target.value})}
-                        placeholder="Ex: GOOGLE-ADS"
-                      />
-                    </div>
                   </div>
                 </section>
 
-                {/* Branding Section */}
+                {/* Branding & Style Section */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8 p-8 bg-zinc-900/30 rounded-[32px] border border-zinc-800/50">
-                  <div className="space-y-2">
-                    <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">Nome da Academia</label>
-                    <input 
-                      type="text" 
-                      className="w-full bg-black/40 border border-zinc-800 rounded-2xl px-6 py-4 outline-none focus:border-amber-500 transition-all font-bold text-white"
-                      value={editingPage?.academyName}
-                      onChange={e => setEditingPage({...editingPage, academyName: e.target.value})}
-                      placeholder="Ex: Dojô Golden"
-                    />
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">Nome da Academia</label>
+                      <input 
+                        type="text" 
+                        className="w-full bg-black/40 border border-zinc-800 rounded-2xl px-6 py-4 outline-none focus:border-amber-500 transition-all font-bold text-white"
+                        value={editingPage?.academyName}
+                        onChange={e => setEditingPage({...editingPage, academyName: e.target.value})}
+                        placeholder="Ex: Dojô Golden"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <UrlInput 
+                        label="URL da Logo (PNG/SVG)"
+                        value={editingPage?.logoUrl || ''}
+                        onChange={v => setEditingPage({...editingPage, logoUrl: v})}
+                        placeholder="https://sua-logo.com/imagem.png"
+                      />
+                    </div>
                   </div>
-                  <div className="space-y-2">
-                    <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">URL da Logo (PNG/SVG)</label>
-                    <input 
-                      type="text" 
-                      className="w-full bg-black/40 border border-zinc-800 rounded-2xl px-6 py-4 outline-none focus:border-amber-500 transition-all text-xs"
-                      value={editingPage?.logoUrl}
-                      onChange={e => setEditingPage({...editingPage, logoUrl: e.target.value})}
-                      placeholder="https://sua-logo.com/imagem.png"
-                    />
+
+                  <div className="space-y-4">
+                    <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">Tema Visual (Paleta)</label>
+                    <div className="grid grid-cols-1 gap-3">
+                      {THEMES.map(theme => (
+                        <button 
+                          key={theme.id}
+                          onClick={() => setEditingPage({...editingPage, theme: theme.id, primaryColor: theme.primary})}
+                          className={`flex items-center gap-4 p-4 rounded-2xl border transition-all ${editingPage?.theme === theme.id ? 'border-amber-500 bg-amber-500/5' : 'border-zinc-800 bg-black/20 hover:bg-zinc-800/50'}`}
+                        >
+                          <div className="flex gap-1">
+                            <div className="w-4 h-4 rounded-full" style={{ backgroundColor: theme.primary }} />
+                            <div className="w-4 h-4 rounded-full" style={{ backgroundColor: theme.secondary }} />
+                          </div>
+                          <span className={`text-xs font-bold ${editingPage?.theme === theme.id ? 'text-amber-500' : 'text-zinc-500'}`}>{theme.name}</span>
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 </div>
 
@@ -900,6 +1269,97 @@ export default function AdminPanel() {
                            {generating ? 'Pensando...' : 'Mágica'}
                          </button>
                       </div>
+
+                      {/* VSL (Video Sales Letter) Options */}
+                      <section className="p-8 bg-purple-500/5 border border-purple-500/10 rounded-[32px] space-y-6">
+                         <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 bg-purple-500 rounded-lg flex items-center justify-center">
+                               <Film className="text-black" size={16} />
+                            </div>
+                            <div>
+                               <h3 className="text-xs font-black uppercase tracking-widest">VSL Strategy</h3>
+                               <p className="text-[10px] text-zinc-500 uppercase tracking-widest font-medium">Força o cliente a assistir o vídeo antes do CTA</p>
+                            </div>
+                            <div className="ml-auto">
+                               <button 
+                                onClick={() => setEditingPage({ ...editingPage, vslEnabled: !editingPage?.vslEnabled })}
+                                className={`w-12 h-6 rounded-full transition-all relative ${editingPage?.vslEnabled ? 'bg-purple-500' : 'bg-zinc-800'}`}
+                               >
+                                  <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${editingPage?.vslEnabled ? 'left-7' : 'left-1'}`} />
+                               </button>
+                            </div>
+                         </div>
+
+                         {editingPage?.vslEnabled && (
+                            <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="space-y-6 pt-4 border-t border-purple-500/10">
+                               <UrlInput 
+                                 label="URL do Vídeo VSL (.mp4 ou YouTube)"
+                                 value={editingPage.vslVideoUrl || ''}
+                                 onChange={v => setEditingPage({ ...editingPage, vslVideoUrl: v })}
+                               />
+                               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                  <div className="space-y-2">
+                                     <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">Título da Trava (Headline)</label>
+                                     <input 
+                                       type="text" 
+                                       className="w-full bg-black/40 border border-zinc-800 rounded-2xl px-6 py-4 outline-none focus:border-amber-500 text-xs font-bold"
+                                       value={editingPage.vslHeadline || ''}
+                                       onChange={e => setEditingPage({ ...editingPage, vslHeadline: e.target.value })}
+                                       placeholder="Assista ao vídeo abaixo para liberar seu acesso"
+                                     />
+                                  </div>
+                                  <div className="space-y-2">
+                                     <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">Subtítulo (Abaixo do Título)</label>
+                                     <input 
+                                       type="text" 
+                                       className="w-full bg-black/40 border border-zinc-800 rounded-2xl px-6 py-4 outline-none focus:border-amber-500 text-xs font-bold"
+                                       value={editingPage.vslSubheadline || ''}
+                                       onChange={e => setEditingPage({ ...editingPage, vslSubheadline: e.target.value })}
+                                       placeholder="Isso levará apenas alguns segundos"
+                                     />
+                                  </div>
+                               </div>
+                               <div className="space-y-2">
+                                  <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">Texto do Botão CTA (Após Vídeo)</label>
+                                  <input 
+                                    type="text" 
+                                    className="w-full bg-black/40 border border-zinc-800 rounded-2xl px-6 py-4 outline-none focus:border-amber-500 text-xs font-bold"
+                                    value={editingPage.vslCtaText || ''}
+                                    onChange={e => setEditingPage({ ...editingPage, vslCtaText: e.target.value })}
+                                    placeholder="Quero garantir minha vaga →"
+                                  />
+                               </div>
+                               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                  <div className="space-y-2">
+                                     <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">Tipo de Desbloqueio</label>
+                                     <select 
+                                       className="w-full bg-black/40 border border-zinc-800 rounded-2xl px-6 py-4 outline-none focus:border-amber-500 text-xs font-bold"
+                                       value={editingPage.vslUnlockType || 'seconds'}
+                                       onChange={e => setEditingPage({ ...editingPage, vslUnlockType: e.target.value as any })}
+                                     >
+                                        <option value="seconds">Por Tempo (Segundos)</option>
+                                        <option value="end">No Final do Vídeo</option>
+                                     </select>
+                                  </div>
+                                  <div className="space-y-2">
+                                     <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">Configuração de Tempo (segundos)</label>
+                                     <input 
+                                       type="number" 
+                                       className="w-full bg-black/40 border border-zinc-800 rounded-2xl px-6 py-4 outline-none focus:border-amber-500 text-sm font-mono"
+                                       value={editingPage.vslAutoSkipSeconds || 0}
+                                       disabled={editingPage.vslUnlockType === 'end'}
+                                       onChange={e => setEditingPage({ ...editingPage, vslAutoSkipSeconds: parseInt(e.target.value) })}
+                                     />
+                                     <p className="text-[9px] text-zinc-600 uppercase tracking-tighter">
+                                       {editingPage.vslUnlockType === 'end' 
+                                         ? 'O CTA aparecerá quando o vídeo terminar.' 
+                                         : 'O CTA aparecerá após os segundos configurados (após o play).'}
+                                     </p>
+                                  </div>
+                               </div>
+                            </motion.div>
+                         )}
+                      </section>
 
                       {/* Content */}
                       <div className="space-y-8">
@@ -980,6 +1440,33 @@ export default function AdminPanel() {
                       </div>
                     </div>
 
+                    {/* Background Settings */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 p-8 bg-zinc-900/30 rounded-[32px] border border-zinc-800/50">
+                       <UrlInput 
+                         label="Imagem de Fundo (Padrão: Preto)"
+                         value={editingPage?.backgroundImage || ''}
+                         onChange={v => setEditingPage({ ...editingPage, backgroundImage: v })}
+                         placeholder="URL da imagem de fundo"
+                       />
+                       <div className="space-y-2">
+                          <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">Opacidade do Fundo ({((editingPage?.backgroundOpacity || 0.1) * 100).toFixed(0)}%)</label>
+                          <input 
+                            type="range" 
+                            min="0" 
+                            max="1" 
+                            step="0.05"
+                            className="w-full h-2 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-amber-500"
+                            value={editingPage?.backgroundOpacity ?? 0.1}
+                            onChange={e => setEditingPage({ ...editingPage, backgroundOpacity: parseFloat(e.target.value) })}
+                          />
+                          <div className="flex justify-between text-[8px] text-zinc-600 font-black uppercase tracking-widest mt-1">
+                             <span>Invisível</span>
+                             <span>Sutil</span>
+                             <span>Nítida</span>
+                          </div>
+                       </div>
+                    </div>
+
                     {/* Checkbox */}
                     <div className="flex items-center gap-4 bg-zinc-900/50 p-6 rounded-2xl border border-zinc-800/50">
                       <input 
@@ -1058,17 +1545,17 @@ export default function AdminPanel() {
                           <Plus size={14} /> Nova Imagem
                         </button>
                       </div>
-                      <div className="grid grid-cols-1 gap-3">
+                      <div className="grid grid-cols-1 gap-6">
                         {editingPage?.images?.map((url, i) => (
-                          <div key={i} className="flex gap-4">
-                            <input 
-                              type="text" 
-                              className="flex-1 bg-zinc-900 border border-zinc-800 rounded-xl px-6 py-3 text-xs outline-none focus:border-amber-500 font-mono text-zinc-500"
-                              value={url}
-                              onChange={e => updateImage(i, e.target.value)}
-                              placeholder="https://..."
-                            />
-                            <button onClick={() => removeImage(i)} className="p-3 bg-zinc-900 hover:bg-red-500/20 text-zinc-700 hover:text-red-500 rounded-xl transition-all">
+                          <div key={i} className="flex gap-4 items-end">
+                            <div className="flex-1">
+                              <UrlInput 
+                                label={`Imagem #${i + 1}`}
+                                value={url}
+                                onChange={v => updateImage(i, v)}
+                              />
+                            </div>
+                            <button onClick={() => removeImage(i)} className="p-4 bg-zinc-900 font-bold hover:bg-red-500/20 text-zinc-700 hover:text-red-500 rounded-2xl transition-all h-14">
                               <Trash2 size={18} />
                             </button>
                           </div>
@@ -1081,7 +1568,7 @@ export default function AdminPanel() {
 
               <div className="p-10 border-t border-zinc-900 bg-zinc-900/20 flex flex-col md:flex-row items-center justify-end gap-6 sticky bottom-0 backdrop-blur-md">
                 <button 
-                  onClick={() => setIsEditing(false)}
+                  onClick={handleCloseEditor}
                   className="w-full md:w-auto px-8 py-4 font-black text-[10px] uppercase tracking-[0.2em] text-zinc-500 hover:text-white transition-all order-2 md:order-1"
                 >
                   Descartar
@@ -1168,6 +1655,170 @@ export default function AdminPanel() {
                 >
                   Excluir de Vez
                 </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Slug Change Warning */}
+      <AnimatePresence>
+        {showSlugWarning && (
+          <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              className="bg-zinc-900 border-2 border-amber-500/50 p-8 rounded-[32px] max-w-md w-full space-y-6 shadow-2xl"
+            >
+              <div className="flex items-center gap-3 text-amber-500">
+                <Info size={24} />
+                <h3 className="text-xl font-bold uppercase italic">Cuidado: Alteração de Rota!</h3>
+              </div>
+              <p className="text-zinc-400 text-sm leading-relaxed">
+                Você está alterando o endereço (slug) de uma página que já possui leads/visitas. 
+                <span className="block mt-2 font-bold text-white underline italic">Isso quebrará o link atual onde seus anúncios estão rodando!</span>
+              </p>
+              <div className="flex gap-4">
+                <button 
+                  onClick={() => setShowSlugWarning(false)} 
+                  className="flex-1 py-4 bg-zinc-800 rounded-2xl font-bold uppercase tracking-widest text-[10px]"
+                >
+                  Voltar e Corrigir
+                </button>
+                <button 
+                  onClick={() => { setShowSlugWarning(false); handleSave(); }}
+                  className="flex-1 py-4 bg-amber-500 text-black rounded-2xl font-bold uppercase tracking-widest text-[10px] hover:bg-amber-400 shadow-lg shadow-amber-500/20"
+                >
+                  Entendi, Salvar
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Unsaved Changes Modal */}
+      <AnimatePresence>
+        {showUnsavedModal && (
+          <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              className="bg-zinc-900 border border-zinc-800 p-8 rounded-[32px] max-w-sm w-full space-y-6"
+            >
+              <h3 className="text-xl font-bold">Respirar Fundo...</h3>
+              <p className="text-zinc-500 text-sm">Você tem alterações não salvas. Deseja realmente sair e descartar tudo?</p>
+              <div className="flex gap-4">
+                <button 
+                  onClick={() => setShowUnsavedModal(false)}
+                  className="flex-1 py-4 bg-zinc-800 rounded-2xl font-bold uppercase tracking-widest text-[10px]"
+                >
+                  Continuar Editando
+                </button>
+                <button 
+                  onClick={() => {
+                    setShowUnsavedModal(false);
+                    setIsEditing(false);
+                    setEditingPage(null);
+                  }}
+                  className="flex-1 py-4 bg-red-600 hover:bg-red-500 rounded-2xl font-bold uppercase tracking-widest text-[10px]"
+                >
+                  Descartar
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Lead Details Modal */}
+      <AnimatePresence>
+        {viewingLead && (
+          <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+            <motion.div 
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-zinc-900 border border-zinc-800 w-full max-w-2xl max-h-[85vh] overflow-hidden rounded-[40px] flex flex-col shadow-2xl"
+            >
+              <div className="p-8 border-b border-zinc-800 flex items-center justify-between sticky top-0 bg-zinc-900/80 backdrop-blur-md">
+                <div className="flex items-center gap-4">
+                   <div className="w-12 h-12 bg-amber-500 rounded-full flex items-center justify-center text-black font-black text-xl">
+                      {viewingLead.name?.charAt(0).toUpperCase()}
+                   </div>
+                   <div>
+                      <h3 className="text-xl font-bold italic uppercase tracking-tight">{viewingLead.name}</h3>
+                      <p className="text-[10px] text-zinc-500 uppercase tracking-widest font-mono">{viewingLead.protocol || 'Sem Protocolo'}</p>
+                   </div>
+                </div>
+                <button onClick={() => setViewingLead(null)} className="p-3 bg-zinc-800 hover:bg-zinc-700 rounded-full transition-all text-zinc-500 hover:text-white">
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div className="p-8 overflow-y-auto flex-1 space-y-8">
+                 {/* Lead Info */}
+                 <div className="grid grid-cols-2 gap-4">
+                    <div className="bg-black/30 p-4 rounded-2xl border border-zinc-800">
+                       <span className="text-[8px] font-black uppercase tracking-widest text-zinc-600 block mb-1">WhatsApp</span>
+                       <span className="text-sm font-bold text-amber-500">{viewingLead.phone}</span>
+                    </div>
+                    <div className="bg-black/30 p-4 rounded-2xl border border-zinc-800">
+                       <span className="text-[8px] font-black uppercase tracking-widest text-zinc-600 block mb-1">E-mail</span>
+                       <span className="text-xs font-medium text-white truncate">{viewingLead.email}</span>
+                    </div>
+                 </div>
+
+                 {/* Content based on Lead Type */}
+                 <div className="space-y-4">
+                    <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500 flex items-center gap-2">
+                       {viewingLead.type === 'chat' ? <MessageSquare size={12} /> : <List size={12} />}
+                       {viewingLead.type === 'chat' ? 'Resumo da Conversa' : 'Dados do Formulário'}
+                    </h4>
+
+                    {viewingLead.type === 'chat' && viewingLead.chatHistory ? (
+                       <div className="space-y-3">
+                          {viewingLead.chatHistory.map((item, i) => (
+                             <div key={i} className={`flex ${item.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                                <div className={`max-w-[85%] px-4 py-3 rounded-2xl text-xs leading-relaxed ${item.role === 'user' ? 'bg-amber-500/10 border border-amber-500/20 text-white' : 'bg-zinc-800 text-zinc-400'}`}>
+                                   {item.message}
+                                </div>
+                             </div>
+                          ))}
+                       </div>
+                    ) : (
+                       <div className="bg-black/40 border border-zinc-800 rounded-3xl p-6 space-y-4">
+                          {Object.entries(viewingLead)
+                            .filter(([key]) => !['id', 'name', 'email', 'phone', 'createdAt', 'protocol', 'chatHistory', 'type', 'city', 'modality', 'campaignCode', 'academyName'].includes(key))
+                            .map(([key, value]) => (
+                               <div key={key} className="flex flex-col gap-1">
+                                  <span className="text-[9px] font-black uppercase tracking-widest text-zinc-600">{key}</span>
+                                  <span className="text-sm text-white font-medium">{value as string}</span>
+                               </div>
+                            ))
+                          }
+                       </div>
+                    )}
+                 </div>
+              </div>
+
+              <div className="p-8 border-t border-zinc-800 bg-zinc-950/30 flex gap-4">
+                 <button 
+                  onClick={() => window.open(`https://wa.me/${viewingLead.phone?.replace(/\D/g, '')}`, '_blank')}
+                  className="flex-1 py-4 bg-emerald-500 text-black rounded-2xl font-black uppercase tracking-widest text-[10px] hover:scale-[1.02] transition-all"
+                 >
+                    Chamar no WhatsApp
+                 </button>
+                 <button 
+                  onClick={() => {
+                    const text = `Lead: ${viewingLead.name}\nProtocolo: ${viewingLead.protocol}\nWhatsApp: ${viewingLead.phone}\nE-mail: ${viewingLead.email}\n\nResumo:\n${viewingLead.chatHistory?.map(m => `${m.role === 'user' ? 'CLIENTE' : 'BOT'}: ${m.message}`).join('\n') || 'N/A'}`;
+                    navigator.clipboard.writeText(text);
+                    alert("Copiado!");
+                  }}
+                  className="p-4 bg-zinc-800 text-zinc-400 rounded-2xl hover:text-white"
+                 >
+                    <Copy size={20} />
+                 </button>
               </div>
             </motion.div>
           </div>

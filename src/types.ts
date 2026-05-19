@@ -20,13 +20,16 @@ export interface ChatOption {
 
 export interface ChatStep {
   id: string;
-  type: 'text' | 'image_options' | 'listbox' | 'media' | 'buttons';
+  type: 'text' | 'image_options' | 'listbox' | 'media' | 'buttons' | 'link';
   message: string;
   options?: ChatOption[];
   mediaUrl?: string;
   mediaType?: 'audio' | 'video';
   multiSelect?: boolean;
   nextStepId?: string;
+  validationType?: 'none' | 'name' | 'email' | 'phone';
+  linkUrl?: string;
+  linkLabel?: string;
 }
 
 export interface ChatConfig {
@@ -34,6 +37,12 @@ export interface ChatConfig {
   contactPhotoUrl?: string;
   backgroundImageUrl?: string;
   steps: ChatStep[];
+}
+
+export interface ChatHistoryItem {
+  role: 'bot' | 'user';
+  message: string;
+  timestamp: string;
 }
 
 export interface LandingPageConfig {
@@ -57,6 +66,16 @@ export interface LandingPageConfig {
   campaignCode: string;
   updatedAt: any;
   chatConfig?: ChatConfig; // Configuração específica para o fluxo de chat
+  theme?: string;
+  backgroundImage?: string;
+  backgroundOpacity?: number;
+  vslEnabled?: boolean;
+  vslVideoUrl?: string;
+  vslAutoSkipSeconds?: number;
+  vslHeadline?: string;
+  vslSubheadline?: string;
+  vslCtaText?: string;
+  vslUnlockType?: 'seconds' | 'end';
 }
 
 export interface Lead {
@@ -68,4 +87,7 @@ export interface Lead {
   modality: string;
   campaignCode: string;
   createdAt: any;
+  protocol?: string;
+  chatHistory?: ChatHistoryItem[];
+  type?: PageType;
 }

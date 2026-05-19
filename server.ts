@@ -4,6 +4,10 @@ import path from "path";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import dotenv from "dotenv";
+import multer from "multer";
+import { v4 as uuidv4 } from "uuid";
+import fs from "fs-extra";
+import sharp from "sharp";
 
 dotenv.config();
 
@@ -12,6 +16,76 @@ async function startServer() {
   const PORT = 3000;
 
   app.use(express.json());
+
+  // Ensure upload directory exists
+  const uploadDir = path.join(process.cwd(), "public", "uploads");
+  await fs.ensureDir(uploadDir);
+
+  // Serve uploads folder - Always serve it, regardless of ENV
+  app.use("/uploads", express.static(uploadDir));
+
+  // Multer config for file upload
+  const storage = multer.memoryStorage();
+  const upload = multer({
+    storage,
+    limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+    fileFilter: (req, file, cb) => {
+      if (file.mimetype.startsWith("image/")) {
+        cb(null, true);
+      } else {
+        cb(new Error("Apenas imagens são permitidas!"));
+      }
+    },
+  });
+
+  // Upload endpoint
+  app.post("/api/upload", upload.single("image"), async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: "Nenhum arquivo enviado." });
+      }
+
+      const filename = `${uuidv4()}.webp`;
+      const filepath = path.join(uploadDir, filename);
+
+      // Process image with sharp (convert to webp and resize if needed)
+      // If crop data is sent in body, apply it
+      let pipeline = sharp(req.file.buffer);
+      
+      if (req.body.crop) {
+        const crop = JSON.parse(req.body.crop);
+        pipeline = pipeline.extract({
+          left: Math.round(crop.x),
+          top: Math.round(crop.y),
+          width: Math.round(crop.width),
+          height: Math.round(crop.height),
+        });
+      }
+
+      await pipeline
+        .resize(1200, 1200, { fit: 'inside', withoutEnlargement: true })
+        .webp({ quality: 80 })
+        .toFile(filepath);
+
+      res.json({ url: `/uploads/${filename}` });
+    } catch (error) {
+      console.error("Upload Error:", error);
+      res.status(500).json({ error: "Erro ao processar imagem." });
+    }
+  });
+
+  // Media Gallery endpoint
+  app.get("/api/media", async (req, res) => {
+    try {
+      const files = await fs.readdir(uploadDir);
+      const images = files
+        .filter(f => f.match(/\.(webp|jpg|jpeg|png|gif|svg)$/i))
+        .map(f => ({ name: f, url: `/uploads/${f}` }));
+      res.json(images);
+    } catch (error) {
+      res.status(500).json({ error: "Erro ao listar mídia." });
+    }
+  });
 
   // API Route for AI Content Generation
   app.post("/api/generate-copy", async (req, res) => {

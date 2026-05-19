@@ -8,8 +8,9 @@ import { useParams } from 'react-router-dom';
 import { db } from '../lib/firebase';
 import { collection, query, where, onSnapshot, addDoc, serverTimestamp } from 'firebase/firestore';
 import { LandingPageConfig, ChatStep, ChatOption } from '../types';
+import { THEMES } from '../themes';
 import { motion, AnimatePresence } from 'motion/react';
-import { Send, ChevronLeft, MoreVertical, Camera, Phone, Video, Info, Image as ImageIcon, CheckCircle2, Play, Volume2 } from 'lucide-react';
+import { Send, ChevronLeft, MoreVertical, Camera, Phone, Video, Info, Image as ImageIcon, CheckCircle2, Play, Volume2, ExternalLink } from 'lucide-react';
 
 export default function ChatPage() {
   const { city, modality } = useParams();
@@ -21,7 +22,21 @@ export default function ChatPage() {
   const [inputValue, setInputValue] = useState('');
   const [responses, setResponses] = useState<Record<string, any>>({});
   const [completed, setCompleted] = useState(false);
+  const [protocol] = useState(() => `${modality?.substring(0, 3).toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}`);
+  const [lastInteraction, setLastInteraction] = useState(Date.now());
+  const [isShaking, setIsShaking] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const idleTime = Date.now() - lastInteraction;
+      if (!completed && !isTyping && idleTime > 60000 && idleTime < 65000) {
+        setIsShaking(true);
+        setTimeout(() => setIsShaking(false), 1000);
+      }
+    }, 5000);
+    return () => clearInterval(timer);
+  }, [lastInteraction, completed, isTyping]);
 
   useEffect(() => {
     if (!city || !modality) return;
@@ -46,6 +61,9 @@ export default function ChatPage() {
 
     return () => unsub();
   }, [city, modality]);
+
+  const currentTheme = THEMES.find(t => t.id === config?.theme) || THEMES[0];
+  const primaryColor = config?.primaryColor || currentTheme.primary;
 
   useEffect(() => {
     if (config?.chatConfig?.steps && messages.length === 0) {
@@ -75,36 +93,28 @@ export default function ChatPage() {
 
     const step = config.chatConfig.steps[index];
     
+    // Send bot message to UI
+    const botMsg = { 
+      role: 'bot' as const, 
+      content: step.message, 
+      type: step.type,
+      mediaUrl: step.mediaUrl,
+      options: step.options 
+    };
+
     // Simulate thinking
     await new Promise(resolve => setTimeout(resolve, 1500));
     
     setIsTyping(false);
-    
-    const newMessages = [...messages];
+    setMessages(prev => [...prev, botMsg]);
+    setCurrentStepIndex(index);
     
     if (step.type === 'media') {
-       newMessages.push({ 
-         role: 'bot', 
-         content: step.message, 
-         type: step.mediaType,
-         mediaUrl: step.mediaUrl 
-       });
-       setMessages(newMessages);
-       
        // Progress to next step after media
        setTimeout(() => {
          const nextIndex = findNextIndex(step);
          processStep(nextIndex);
        }, 5000);
-    } else {
-       newMessages.push({ 
-         role: 'bot', 
-         content: step.message, 
-         type: step.type,
-         options: step.options 
-       });
-       setMessages(newMessages);
-       setCurrentStepIndex(index);
     }
   };
 
@@ -129,12 +139,41 @@ export default function ChatPage() {
     const currentStep = config?.chatConfig?.steps[currentStepIndex];
     if (!currentStep) return;
 
+    // Validation
+    if (currentStep.validationType === 'email') {
+      if (!value.includes('@') || value.length < 5) {
+        setIsTyping(true);
+        setTimeout(() => {
+          setIsTyping(false);
+          setMessages(prev => [...prev, { role: 'bot', content: "Ops, esse e-mail parece inválido. Pode conferir por favor? 📧" }]);
+        }, 1000);
+        return;
+      }
+    }
+    if (currentStep.validationType === 'phone') {
+      const cleanPhone = value.replace(/\D/g, '');
+      if (cleanPhone.length < 8) {
+         setIsTyping(true);
+         setTimeout(() => {
+           setIsTyping(false);
+           setMessages(prev => [...prev, { role: 'bot', content: "Preciso de um número válido com DDD para te chamar depois! 📱" }]);
+         }, 1000);
+        return;
+      }
+    }
+    if (currentStep.validationType === 'name' && value.trim().length < 2) {
+       return;
+    }
+
+    setLastInteraction(Date.now());
+
     // Save response
-    const newResponses = { ...responses, [currentStep.message]: label || value };
+    const key = currentStep.validationType !== 'none' && currentStep.validationType ? currentStep.validationType : currentStep.message;
+    const newResponses = { ...responses, [key]: label || value };
     setResponses(newResponses);
 
     // Add user message to UI
-    setMessages([...messages, { role: 'user', content: label || value }]);
+    setMessages(prev => [...prev, { role: 'user', content: label || value }]);
     setInputValue('');
 
     const nextIndex = findNextIndex(currentStep, value);
@@ -145,12 +184,21 @@ export default function ChatPage() {
     if (!config) return;
     
     const leadData = {
+      name: responses.name || 'Anônimo',
+      email: responses.email || '',
+      phone: responses.phone || '',
       ...responses,
       city: config.city,
       modality: config.modality,
-      campaign: config.campaignCode,
+      campaignCode: config.campaignCode,
       academyName: config.academyName,
       type: 'chat',
+      protocol,
+      chatHistory: messages.map(m => ({ 
+        role: m.role, 
+        message: m.content, 
+        timestamp: new Date().toISOString() 
+      })),
       createdAt: serverTimestamp(),
     };
 
@@ -166,17 +214,20 @@ export default function ChatPage() {
     }
   };
 
-  if (loading) return <div className="min-h-screen bg-black flex items-center justify-center"><div className="w-8 h-8 border-2 border-amber-500 border-t-transparent rounded-full animate-spin" /></div>;
+  if (loading) return <div className="min-h-screen bg-black flex items-center justify-center"><div className="w-8 h-8 border-2 rounded-full animate-spin" style={{ borderTopColor: primaryColor }} /></div>;
   
   if (!config) return (
-    <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center p-10 text-center">
+    <div className="min-h-screen flex flex-col items-center justify-center p-10 text-center" style={{ backgroundColor: currentTheme.bg, color: currentTheme.text }}>
       <h1 className="text-4xl font-black mb-4">404</h1>
-      <p className="text-zinc-500 uppercase tracking-widest text-xs">Fluxo de conversa não encontrado.</p>
+      <p className="opacity-50 uppercase tracking-widest text-xs">Fluxo de conversa não encontrado.</p>
     </div>
   );
 
   return (
-    <div className="flex flex-col h-screen bg-black text-white font-sans max-w-lg mx-auto border-x border-zinc-900 relative shadow-2xl">
+    <div 
+      className={`flex flex-col h-screen font-sans max-w-lg mx-auto border-x border-zinc-900 relative shadow-2xl transition-all duration-300 ${isShaking ? 'translate-x-2' : ''}`}
+      style={{ backgroundColor: currentTheme.bg, color: currentTheme.text }}
+    >
       {/* Background Image with Overlay */}
       {config.chatConfig?.backgroundImageUrl && (
         <div 
@@ -244,30 +295,75 @@ export default function ChatPage() {
                 {/* Bubble */}
                 <div className={`px-4 py-3 rounded-2xl text-sm leading-relaxed ${
                   msg.role === 'user' 
-                    ? 'bg-blue-600 text-white rounded-br-none' 
-                    : 'bg-zinc-800 text-white rounded-bl-none'
-                }`}>
+                    ? 'text-white rounded-br-none' 
+                    : 'text-white rounded-bl-none'
+                }`} style={{ backgroundColor: msg.role === 'user' ? primaryColor : (currentTheme.secondary || '#27272a'), color: msg.role === 'user' ? '#000' : 'inherit' }}>
                   {msg.content}
                 </div>
 
                 {/* Media Content */}
-                {msg.type === 'video' && msg.mediaUrl && (
-                  <div className="rounded-2xl overflow-hidden border border-zinc-800 bg-zinc-900">
-                    <video src={msg.mediaUrl} controls autoPlay className="w-full" />
+                {msg.type === 'media' && msg.mediaUrl && (
+                  <div className="rounded-2xl overflow-hidden border border-zinc-800 bg-zinc-900 aspect-video w-full">
+                    {msg.mediaUrl.includes('youtube.com') || msg.mediaUrl.includes('youtu.be') ? (
+                      <iframe 
+                        src={`${msg.mediaUrl.replace('watch?v=', 'embed/')}?autoplay=1&mute=1`}
+                        className="w-full h-full"
+                        allow="autoplay; encrypted-media"
+                      />
+                    ) : msg.mediaUrl.match(/\.(mp4|webm|ogg)$/i) || msg.mediaUrl.includes('firebasestorage') ? (
+                      <video src={msg.mediaUrl} controls autoPlay muted className="w-full" />
+                    ) : (
+                      <img src={msg.mediaUrl} className="w-full" referrerPolicy="no-referrer" />
+                    )}
+                  </div>
+                )}
+
+                {msg.type === 'link' && (
+                  <div className="space-y-3">
+                     <a 
+                       href={config?.chatConfig?.steps.find(s => s.message === msg.content)?.linkUrl || '#'} 
+                       target="_blank" 
+                       rel="noopener noreferrer"
+                       className="block bg-zinc-800 p-4 rounded-xl border border-zinc-700 hover:border-blue-500 transition-all group"
+                     >
+                        <div className="flex items-center justify-between gap-4">
+                           <div className="w-10 h-10 bg-zinc-700 rounded-lg flex items-center justify-center shrink-0">
+                              <ExternalLink size={20} className="text-blue-500" />
+                           </div>
+                           <div className="flex-1 min-w-0">
+                              <p className="text-xs font-bold truncate">{config?.chatConfig?.steps.find(s => s.message === msg.content)?.linkLabel || 'Acessar Link'}</p>
+                              <p className="text-[10px] text-zinc-500 truncate">{config?.chatConfig?.steps.find(s => s.message === msg.content)?.linkUrl}</p>
+                           </div>
+                        </div>
+                     </a>
+                     <button 
+                       onClick={() => {
+                          const currentStep = config?.chatConfig?.steps[currentStepIndex];
+                          if (currentStep) {
+                            const nextIndex = findNextIndex(currentStep);
+                            processStep(nextIndex);
+                          }
+                       }}
+                       style={{ backgroundColor: primaryColor }}
+                       className="w-full py-2 text-black rounded-xl text-[10px] font-black uppercase tracking-widest"
+                     >
+                        Continuar conversa →
+                     </button>
                   </div>
                 )}
 
                 {msg.type === 'audio' && msg.mediaUrl && (
-                  <div className="flex items-center gap-3 bg-zinc-800 p-3 rounded-2xl border border-zinc-700">
-                    <div className="w-10 h-10 bg-amber-500 rounded-full flex items-center justify-center">
+                  <div className="flex items-center gap-3 p-3 rounded-2xl border border-zinc-700" style={{ backgroundColor: currentTheme.secondary }}>
+                    <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ backgroundColor: primaryColor }}>
                       <Volume2 size={20} className="text-black" />
                     </div>
-                    <div className="flex-1 h-1 bg-zinc-700 rounded-full overflow-hidden">
+                    <div className="flex-1 h-1 rounded-full overflow-hidden" style={{ backgroundColor: currentTheme.bg }}>
                        <motion.div 
                         initial={{ width: 0 }}
                         animate={{ width: '100%' }}
                         transition={{ duration: 5 }}
-                        className="h-full bg-amber-500" 
+                        className="h-full" 
+                        style={{ backgroundColor: primaryColor }}
                        />
                     </div>
                   </div>
@@ -292,7 +388,8 @@ export default function ChatPage() {
                           <button 
                             key={idx}
                             onClick={() => handleUserInput(opt.value, opt.label)}
-                            className="flex flex-col items-center gap-2 p-2 bg-zinc-900 border border-zinc-800 rounded-xl hover:border-amber-500 transition-all"
+                            className="flex flex-col items-center gap-2 p-2 rounded-xl border transition-all hover:opacity-80"
+                            style={{ backgroundColor: currentTheme.secondary, borderColor: currentTheme.border }}
                           >
                             <img src={opt.imageUrl} className="w-full aspect-square object-cover rounded-lg" alt={opt.label} />
                             <span className="text-[9px] font-black uppercase text-center">{opt.label}</span>
@@ -344,6 +441,11 @@ export default function ChatPage() {
             animate={{ opacity: 1, scale: 1 }}
             className="flex flex-col items-center py-10 space-y-6"
           >
+             <div className="flex flex-col items-center gap-1">
+                <span className="text-[8px] font-black uppercase tracking-widest opacity-40">Protocolo</span>
+                <span className="text-xs font-mono font-bold px-3 py-1 rounded-full border" style={{ color: primaryColor, backgroundColor: `${primaryColor}1A`, borderColor: `${primaryColor}33` }}>{protocol}</span>
+             </div>
+
              <div className="w-20 h-20 bg-emerald-500 rounded-full flex items-center justify-center shadow-2xl shadow-emerald-500/20 relative">
                 <CheckCircle2 size={40} className="text-black" />
                 <motion.div 
@@ -360,7 +462,10 @@ export default function ChatPage() {
                 </p>
              </div>
              <button 
-                onClick={() => window.location.href = `https://wa.me/${config.whatsappNumber?.replace(/\D/g, '')}`}
+                onClick={() => {
+                  const whatsappMsg = `Olá! Tenho interesse na aula de ${config.modality} em ${config.city}. Meu protocolo é: ${protocol}`;
+                  window.location.href = `https://wa.me/${config.whatsappNumber?.replace(/\D/g, '')}?text=${encodeURIComponent(whatsappMsg)}`;
+                }}
                 className="w-full max-w-xs py-5 bg-emerald-500 text-black rounded-3xl font-black uppercase tracking-widest text-xs shadow-xl shadow-emerald-500/20 hover:scale-105 transition-all"
               >
                Chamar no WhatsApp Agora

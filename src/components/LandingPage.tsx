@@ -8,6 +8,7 @@ import { useParams, useSearchParams } from 'react-router-dom';
 import { collection, query, where, getDocs, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { LandingPageConfig, Lead } from '../types';
+import { THEMES } from '../themes';
 import { motion, AnimatePresence } from 'motion/react';
 import { Helmet } from 'react-helmet-async';
 import { MessageCircle, Send, CheckCircle, Image as ImageIcon, Video, Star, Phone, User, Mail, MapPin } from 'lucide-react';
@@ -19,8 +20,74 @@ export default function LandingPage() {
   const [loading, setLoading] = useState(true);
   const [formSubmitted, setFormSubmitted] = useState(false);
   const [lead, setLead] = useState({ name: '', email: '', phone: '' });
+  const [vslUnlocked, setVslUnlocked] = useState(false);
+  const [canUnlock, setCanUnlock] = useState(false);
+  const [timer, setTimer] = useState(0);
+  const [vslStarted, setVslStarted] = useState(false);
+
+  // VSL YouTube URL Parser Helper
+  const getEmbedUrl = (url: string) => {
+    if (!url) return '';
+    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+    const match = url.match(regExp);
+    const videoId = (match && match[2].length === 11) ? match[2] : null;
+    
+    if (videoId) {
+      return `https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&enablejsapi=1&origin=${window.location.origin}`;
+    }
+    return url;
+  };
 
   const campaign = searchParams.get('utm_campaign') || config?.campaignCode || 'direto';
+
+  useEffect(() => {
+    if (config?.vslEnabled && !vslUnlocked && vslStarted) {
+      if (config.vslUnlockType === 'end') {
+         // Se for por final de vídeo, o canUnlock é setado pelo evento onEnded (para <video>) 
+         // ou pela mensagem do YouTube Iframe
+         return;
+      }
+
+      if (config.vslAutoSkipSeconds && config.vslAutoSkipSeconds > 0) {
+        const interval = setInterval(() => {
+          setTimer(prev => {
+            if (prev >= (config.vslAutoSkipSeconds || 0)) {
+              setCanUnlock(true);
+              clearInterval(interval);
+              return prev;
+            }
+            return prev + 1;
+          });
+        }, 1000);
+        return () => clearInterval(interval);
+      } else {
+        setCanUnlock(true);
+      }
+    }
+  }, [config, vslUnlocked, vslStarted]);
+
+  // Listen for YouTube API messages
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      // Check if it's from YouTube
+      if (!event.origin.includes('youtube.com')) return;
+      try {
+        const data = JSON.parse(event.data);
+        if (data.event === 'onStateChange') {
+          const state = data.info;
+          // 0 = ended
+          if (state === 0 && config?.vslUnlockType === 'end') {
+            setCanUnlock(true);
+          }
+        }
+      } catch (e) {
+        // Not JSON or other error
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [config]);
 
   useEffect(() => {
     async function fetchConfig() {
@@ -112,14 +179,121 @@ export default function LandingPage() {
     );
   }
 
-  const primaryColor = config.primaryColor || '#f59e0b';
+  const currentTheme = THEMES.find(t => t.id === config.theme) || THEMES[0];
+  const primaryColor = config.primaryColor || currentTheme.primary;
   const whatsappUrl = `https://wa.me/${config.whatsappNumber.replace(/\D/g, '')}?text=Olá! Gostaria de saber mais sobre as aulas de ${config.modality} em ${config.city}`;
 
   const pageTitle = config?.title || `${modality} em ${city} | Aula Experimental Grátis`;
   const pageDesc = config?.description || `Inscreva-se para aulas de ${modality} em ${city}. Venha conhecer nossa unidade e transforme sua vida.`;
 
   return (
-    <div className="min-h-screen bg-[#0F0F10] text-white font-sans selection:bg-amber-500/30 overflow-x-hidden flex flex-col">
+    <div 
+      className="min-h-screen text-white font-sans selection:bg-[var(--primary)]/30 overflow-x-hidden flex flex-col relative"
+      style={{ 
+        backgroundColor: currentTheme.bg, 
+        color: currentTheme.text,
+        '--primary': primaryColor,
+        '--secondary': currentTheme.secondary,
+        '--accent': currentTheme.accent,
+        '--card': currentTheme.card,
+        '--border': currentTheme.border,
+      } as React.CSSProperties}
+    >
+      {/* Custom Background Image */}
+      {config.backgroundImage && (
+        <div 
+          className="fixed inset-0 pointer-events-none -z-20 bg-cover bg-center bg-no-repeat"
+          style={{ 
+            backgroundImage: `url(${config.backgroundImage})`, 
+            opacity: config.backgroundOpacity ?? 0.1,
+            filter: 'grayscale(100%)'
+          }}
+        />
+      )}
+
+      {/* VSL Overlay */}
+      <AnimatePresence>
+        {config.vslEnabled && !vslUnlocked && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] bg-black flex flex-col items-center justify-center p-6 text-center"
+          >
+            <div className="max-w-4xl w-full space-y-8">
+               <div className="space-y-4">
+                  <h2 className="text-3xl md:text-5xl font-black uppercase italic tracking-tighter leading-none" style={{ color: currentTheme.text }}>
+                     {config.vslHeadline || 'Assista ao vídeo abaixo para liberar seu acesso'}
+                  </h2>
+                  <p className="text-sm uppercase tracking-widest font-bold opacity-60">
+                     {config.vslSubheadline || 'Isso levará apenas alguns segundos'}
+                  </p>
+               </div>
+
+               <div className="aspect-video w-full rounded-3xl overflow-hidden bg-zinc-900 shadow-2xl ring-4 ring-zinc-800 relative group">
+                  {!vslStarted ? (
+                     <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 backdrop-blur-sm z-10 cursor-pointer group-hover:bg-black/40 transition-colors" onClick={() => setVslStarted(true)}>
+                        <div className="w-20 h-20 bg-white/10 rounded-full flex items-center justify-center border border-white/20 group-hover:scale-110 transition-transform">
+                           <Video className="text-white fill-white" size={32} />
+                        </div>
+                        <p className="mt-4 text-xs font-black uppercase tracking-[0.3em] text-white/50">Clique para dar o play</p>
+                     </div>
+                  ) : (
+                     <>
+                       {config.vslVideoUrl?.includes('youtube.com') || config.vslVideoUrl?.includes('youtu.be') ? (
+                         <iframe 
+                           src={getEmbedUrl(config.vslVideoUrl || '')}
+                           className="w-full h-full"
+                           allow="autoplay; encrypted-media"
+                         />
+                       ) : (
+                         <video 
+                           src={config.vslVideoUrl} 
+                           autoPlay 
+                           controls={true}
+                           onEnded={() => setCanUnlock(true)}
+                           className="w-full h-full object-cover"
+                         />
+                       )}
+                     </>
+                  )}
+                </div>
+                <div className="h-20 flex items-center justify-center">
+                  <AnimatePresence mode="wait">
+                    {canUnlock ? (
+                      <motion.button
+                        key="unlock-btn"
+                        initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        onClick={() => {
+                          setVslUnlocked(true);
+                          window.scrollTo({ top: 0, behavior: 'smooth' });
+                        }}
+                        style={{ backgroundColor: primaryColor }}
+                        className="px-12 py-5 text-black font-black uppercase tracking-widest rounded-2xl shadow-xl hover:scale-105 active:scale-95 transition-all"
+                      >
+                         {config.vslCtaText || 'Quero garantir minha vaga →'}
+                      </motion.button>
+                    ) : (
+                      <motion.div 
+                        key="timer" 
+                        initial={{ opacity: 0 }} 
+                        animate={{ opacity: 1 }}
+                        className="text-zinc-600 text-xs font-black uppercase tracking-[0.3em] flex flex-col items-center gap-2"
+                      >
+                         <div className="w-12 h-12 border-2 border-zinc-800 rounded-full animate-spin" style={{ borderTopColor: primaryColor }} />
+                         {config.vslUnlockType === 'end' 
+                            ? 'Assista até o final para liberar...' 
+                            : `Liberando em ${Math.max(0, (config.vslAutoSkipSeconds || 0) - timer)}s...`}
+                      </motion.div>
+                    ) }
+                  </AnimatePresence>
+                </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <Helmet>
         <title>{pageTitle}</title>
         <meta name="description" content={pageDesc} />
@@ -147,12 +321,15 @@ export default function LandingPage() {
       </Helmet>
 
       {/* Navbar */}
-      <nav className="px-6 md:px-12 py-6 flex justify-between items-center bg-gradient-to-b from-black/80 to-transparent fixed top-0 w-full z-50 backdrop-blur-sm">
+      <nav 
+        className="px-6 md:px-12 py-6 flex justify-between items-center fixed top-0 w-full z-50 backdrop-blur-sm"
+        style={{ backgroundImage: `linear-gradient(to bottom, ${currentTheme.secondary}CC, transparent)` }}
+      >
         <div className="flex items-center gap-3">
           {config.logoUrl ? (
-            <img src={config.logoUrl} alt={config.academyName} className="h-10 md:h-12 w-auto object-contain" referrerPolicy="no-referrer" />
+            <img src={config.logoUrl} alt={config.academyName} className="h-10 md:h-12 w-auto max-w-[150px] md:max-w-[200px] object-contain" referrerPolicy="no-referrer" />
           ) : (
-            <div className="w-10 h-10 bg-amber-500 flex items-center justify-center rounded-lg rotate-3 shadow-lg shadow-amber-500/30">
+            <div className="w-10 h-10 flex items-center justify-center rounded-lg rotate-3 shadow-lg" style={{ backgroundColor: primaryColor }}>
               <span className="text-black font-black text-xl italic font-display">BJJ</span>
             </div>
           )}
@@ -161,9 +338,9 @@ export default function LandingPage() {
           </h1>
         </div>
         <div className="flex gap-4 md:gap-8 text-xs font-bold uppercase tracking-widest">
-          <a href="#" className="text-amber-500">Início</a>
-          <a href="#espaco" className="hover:text-amber-400 transition-colors">Dojô</a>
-          <a href="#contato" className="hover:text-amber-400 transition-colors">Agendar</a>
+          <a href="#" style={{ color: primaryColor }}>Início</a>
+          <a href="#espaco" className="hover:opacity-80 transition-opacity">Dojô</a>
+          <a href="#contato" className="hover:opacity-80 transition-opacity">Agendar</a>
         </div>
       </nav>
 
@@ -171,14 +348,18 @@ export default function LandingPage() {
       <main className="flex-1 flex flex-col pt-32 lg:pt-20">
         <section className="relative px-6 md:px-12 pb-20 flex flex-col lg:flex-row items-center gap-12 lg:min-h-[80vh]">
           {/* Background decoration */}
-          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[150%] h-[1000px] bg-gradient-to-br from-amber-950/20 via-zinc-950 to-transparent blur-3xl -z-10" />
+          <div 
+            className="absolute top-0 left-1/2 -translate-x-1/2 w-[150%] h-[1000px] blur-3xl -z-10" 
+            style={{ backgroundImage: `linear-gradient(to bottom right, ${primaryColor}1A, ${currentTheme.bg}, transparent)` }}
+          />
 
           {/* Left Column: Copy */}
           <div className="w-full lg:w-3/5 space-y-8">
             <motion.div
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
-              className="inline-block py-1 px-3 bg-white/5 border border-white/10 rounded-full text-[10px] font-bold tracking-widest text-amber-500 uppercase"
+              className="inline-block py-1 px-3 bg-white/5 border border-white/10 rounded-full text-[10px] font-bold tracking-widest uppercase"
+              style={{ color: primaryColor }}
             >
               📍 {config.city} • {config.modality}
             </motion.div>
@@ -190,7 +371,7 @@ export default function LandingPage() {
               className="text-6xl md:text-8xl font-black leading-[0.9] tracking-tighter font-display"
             >
               {config.title.split(' ').map((word, i) => (
-                <span key={i} className={i % 3 === 2 ? "text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-amber-600 italic block mt-2" : "block"}>
+                <span key={i} className={i % 3 === 2 ? "italic block mt-2 opacity-90" : "block"}>
                   {word}{' '}
                 </span>
               ))}
@@ -200,9 +381,9 @@ export default function LandingPage() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2 }}
-              className="text-lg md:text-xl text-zinc-400 max-w-lg leading-relaxed"
+              className="text-lg md:text-xl opacity-60 max-w-lg leading-relaxed"
             >
-              Transforme sua vida através do <span className="text-white font-semibold underline decoration-amber-500 underline-offset-4">{config.modality}</span>. Disciplina, técnica e comunidade em {config.city}.
+              Transforme sua vida através do <span className="font-semibold underline underline-offset-4" style={{ textDecorationColor: primaryColor }}>{config.modality}</span>. Disciplina, técnica e comunidade em {config.city}.
             </motion.p>
 
             <motion.div 
@@ -214,7 +395,7 @@ export default function LandingPage() {
               <a 
                 href="#contato"
                 style={{ backgroundColor: primaryColor }}
-                className="px-8 py-5 text-black font-black text-lg rounded-xl shadow-xl shadow-amber-500/20 hover:scale-105 active:scale-95 transition-all text-center uppercase tracking-tight"
+                className="px-8 py-5 text-black font-black text-lg rounded-xl shadow-xl hover:scale-105 active:scale-95 transition-all text-center uppercase tracking-tight"
               >
                 {config.ctaText}
               </a>
@@ -237,16 +418,16 @@ export default function LandingPage() {
               className="grid grid-cols-2 md:grid-cols-3 gap-6 pt-12"
             >
               <div className="bg-zinc-900/40 p-4 rounded-2xl border border-white/5 backdrop-blur-sm">
-                <div className="text-amber-500 font-black text-xl mb-1 font-display">+500</div>
-                <div className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold">Alunos Ativos</div>
+                <div className="font-black text-xl mb-1 font-display" style={{ color: primaryColor }}>+500</div>
+                <div className="text-[10px] opacity-40 uppercase tracking-widest font-bold">Alunos Ativos</div>
               </div>
               <div className="bg-zinc-900/40 p-4 rounded-2xl border border-white/5 backdrop-blur-sm">
-                <div className="text-amber-500 font-black text-xl mb-1 font-display">100%</div>
-                <div className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold">Black Belts</div>
+                <div className="font-black text-xl mb-1 font-display" style={{ color: primaryColor }}>100%</div>
+                <div className="text-[10px] opacity-40 uppercase tracking-widest font-bold">Black Belts</div>
               </div>
               <div className="bg-zinc-900/40 p-4 rounded-2xl border border-white/5 backdrop-blur-sm hidden md:block">
-                <div className="text-amber-500 font-black text-xl mb-1 font-display">24/7</div>
-                <div className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold">Vagas Limitadas</div>
+                <div className="font-black text-xl mb-1 font-display" style={{ color: primaryColor }}>24/7</div>
+                <div className="text-[10px] opacity-40 uppercase tracking-widest font-bold">Vagas Limitadas</div>
               </div>
             </motion.div>
           </div>
@@ -261,7 +442,7 @@ export default function LandingPage() {
                 id="contato"
                 className="bg-zinc-900 border border-zinc-800 p-8 md:p-10 rounded-[32px] shadow-2xl relative"
               >
-                <div className="absolute -top-4 -right-4 bg-amber-500 text-black font-black px-4 py-2 rounded-lg -rotate-12 shadow-lg text-sm z-10">
+                <div className="absolute -top-4 -right-4 text-black font-black px-4 py-2 rounded-lg -rotate-12 shadow-lg text-sm z-10" style={{ backgroundColor: primaryColor }}>
                   AULA GRÁTIS
                 </div>
                 
@@ -285,14 +466,14 @@ export default function LandingPage() {
                     </motion.div>
                   ) : (
                     <motion.div key="form">
-                      <h3 className="text-2xl font-bold mb-8 text-center">Inicie sua <span className="text-amber-500 italic">Jornada</span></h3>
+                      <h3 className="text-2xl font-bold mb-8 text-center">Inicie sua <span className="italic" style={{ color: 'var(--primary)' }}>Jornada</span></h3>
                       <form onSubmit={handleSubmit} className="space-y-5">
                         <div className="space-y-1.5">
                           <label className="block text-[10px] uppercase tracking-widest text-zinc-500 font-black">Seu Nome</label>
                           <input 
                             required
                             type="text" 
-                            className="w-full bg-black/40 border border-zinc-800 rounded-xl px-4 py-4 text-sm focus:border-amber-500 outline-none placeholder:text-zinc-700 transition-colors"
+                            className="w-full bg-black/40 border border-zinc-800 rounded-xl px-4 py-4 text-sm outline-none placeholder:text-zinc-700 transition-colors focus:border-[var(--primary)]"
                             placeholder="Ex: Roberto Silva"
                             value={lead.name}
                             onChange={e => setLead({...lead, name: e.target.value})}
@@ -303,7 +484,7 @@ export default function LandingPage() {
                           <input 
                             required
                             type="email" 
-                            className="w-full bg-black/40 border border-zinc-800 rounded-xl px-4 py-4 text-sm focus:border-amber-500 outline-none placeholder:text-zinc-700 transition-colors"
+                            className="w-full bg-black/40 border border-zinc-800 rounded-xl px-4 py-4 text-sm outline-none placeholder:text-zinc-700 transition-colors focus:border-[var(--primary)]"
                             placeholder="seu@email.com"
                             value={lead.email}
                             onChange={e => setLead({...lead, email: e.target.value})}
@@ -314,7 +495,7 @@ export default function LandingPage() {
                           <input 
                             required
                             type="tel" 
-                            className="w-full bg-black/40 border border-zinc-800 rounded-xl px-4 py-4 text-sm focus:border-amber-500 outline-none placeholder:text-zinc-700 transition-colors"
+                            className="w-full bg-black/40 border border-zinc-800 rounded-xl px-4 py-4 text-sm outline-none placeholder:text-zinc-700 transition-colors focus:border-[var(--primary)]"
                             placeholder="(11) 99999-9999"
                             value={lead.phone}
                             onChange={e => setLead({...lead, phone: e.target.value})}
@@ -323,8 +504,8 @@ export default function LandingPage() {
                         <div className="pt-4">
                           <button 
                             type="submit"
-                            style={{ backgroundColor: primaryColor }}
-                            className="w-full py-5 text-black font-black rounded-xl hover:brightness-110 active:scale-[0.98] transition-all uppercase tracking-widest text-sm shadow-xl shadow-amber-500/10"
+                            className="w-full py-5 text-black font-black rounded-xl hover:brightness-110 active:scale-[0.98] transition-all uppercase tracking-widest text-sm shadow-xl"
+                            style={{ backgroundColor: primaryColor, boxShadow: `0 20px 25px -5px ${primaryColor}1A` }}
                           >
                             Agendar Agora
                           </button>
@@ -346,7 +527,7 @@ export default function LandingPage() {
                       </div>
                       <div>
                         <p className="text-sm italic text-zinc-300 italic leading-relaxed font-serif">"{config.testimonials[0].text}"</p>
-                        <p className="text-[10px] text-amber-500 font-bold uppercase mt-2">{config.testimonials[0].name}, {config.testimonials[0].role}</p>
+                        <p className="text-[10px] font-bold uppercase mt-2" style={{ color: primaryColor }}>{config.testimonials[0].name}, {config.testimonials[0].role}</p>
                       </div>
                     </div>
                   </div>
@@ -360,7 +541,7 @@ export default function LandingPage() {
         {config.videoUrl && (
           <section className="py-24 px-6 bg-zinc-950/80 border-y border-white/5">
             <div className="max-w-5xl mx-auto">
-              <h3 className="text-3xl font-black mb-12 text-center uppercase tracking-tighter">O Caminho do <span className="text-amber-500 italic">Guerreiro</span></h3>
+              <h3 className="text-3xl font-black mb-12 text-center uppercase tracking-tighter">O Caminho do <span className="italic" style={{ color: primaryColor }}>Guerreiro</span></h3>
               <motion.div 
                 whileInView={{ opacity: 1, scale: 1 }}
                 initial={{ opacity: 0, scale: 0.95 }}
@@ -384,10 +565,10 @@ export default function LandingPage() {
             <div className="max-w-6xl mx-auto">
               <div className="flex flex-col md:flex-row md:items-end justify-between mb-16 gap-6">
                 <div>
-                  <span className="text-amber-500 font-bold uppercase tracking-[0.2em] text-xs">A Academia</span>
+                  <span className="font-bold uppercase tracking-[0.2em] text-xs" style={{ color: primaryColor }}>A Academia</span>
                   <h2 className="text-5xl font-black tracking-tighter mt-2 font-display">NOSSO <span className="text-zinc-700 italic">QG</span></h2>
                 </div>
-                <p className="text-zinc-500 max-w-sm text-sm border-l-2 border-amber-500/30 pl-4 italic">Estrutura premium focada na alta performance e segurança de nossos alunos.</p>
+                <p className="text-zinc-500 max-w-sm text-sm pl-4 italic border-l-2" style={{ borderLeftColor: `${primaryColor}4D` }}>Estrutura premium focada na alta performance e segurança de nossos alunos.</p>
               </div>
               
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -412,7 +593,7 @@ export default function LandingPage() {
             <div className="max-w-4xl mx-auto">
               <h2 className="text-3xl font-black mb-20 text-center italic uppercase tracking-[0.3em] flex items-center justify-center gap-6">
                 <div className="h-px bg-zinc-800 flex-1 hidden md:block"></div>
-                <Star className="text-amber-500 fill-amber-500" size={20} /> DOJO TALK <Star className="text-amber-500 fill-amber-500" size={20} />
+                <Star style={{ color: primaryColor, fill: primaryColor }} size={20} /> DOJO TALK <Star style={{ color: primaryColor, fill: primaryColor }} size={20} />
                 <div className="h-px bg-zinc-800 flex-1 hidden md:block"></div>
               </h2>
               <div className="grid gap-12">
@@ -422,7 +603,8 @@ export default function LandingPage() {
                     initial={{ opacity: 0, y: 20 }}
                     whileInView={{ opacity: 1, y: 0 }}
                     viewport={{ once: true }}
-                    className="bg-zinc-900/50 p-10 rounded-[40px] border border-white/5 relative group hover:border-amber-500/20 transition-colors"
+                    className="bg-zinc-900/50 p-10 rounded-[40px] border border-white/5 relative group transition-colors"
+                    style={{ hoverBorderColor: `${primaryColor}33` } as any}
                   >
                     <p className="text-2xl md:text-3xl italic mb-10 leading-snug font-serif">"{t.text}"</p>
                     <div className="flex items-center gap-5">
@@ -431,7 +613,7 @@ export default function LandingPage() {
                       </div>
                       <div>
                         <p className="text-lg font-bold tracking-tight uppercase">{t.name}</p>
-                        <p className="text-amber-500 text-xs font-bold uppercase tracking-widest">{t.role}</p>
+                        <p className="text-xs font-bold uppercase tracking-widest" style={{ color: primaryColor }}>{t.role}</p>
                       </div>
                     </div>
                   </motion.div>
@@ -446,7 +628,7 @@ export default function LandingPage() {
       <div className="bg-zinc-950 px-12 py-4 border-t border-white/5 flex flex-col md:flex-row justify-between items-center text-[10px] uppercase tracking-[0.2em] text-zinc-600 gap-4 mt-20 md:mt-0 font-mono">
         <div>Propriedade: {config.academyName} • {config.city}</div>
         <div className="flex gap-6">
-          <span className="text-amber-500/50">Campanha: {campaign}</span>
+          <span style={{ color: `${primaryColor}80` }}>Campanha: {campaign}</span>
           <span>Tecnologia por <a href="https://github.com/hpgalvao/Gerador-Dojo" target="_blank" rel="noopener noreferrer" className="hover:text-white underline underline-offset-2">Helio P. Galvão</a></span>
         </div>
         <div className="flex gap-2 items-center">
@@ -470,7 +652,7 @@ export default function LandingPage() {
         </div>
       </a>
       <div className="text-center py-6 bg-black text-[8px] text-zinc-800 uppercase tracking-[0.4em] font-mono border-t border-white/5">
-        Built by <a href="https://selectone.com.br" target="_blank" className="hover:text-amber-500 transition-colors">SelectOne</a> & <a href="https://goldenfight.com.br" target="_blank" className="hover:text-amber-500 transition-colors">Golden Fight</a>
+        Built by <a href="https://selectone.com.br" target="_blank" className="transition-colors hover:text-[var(--primary)]">SelectOne</a> & <a href="https://goldenfight.com.br" target="_blank" className="transition-colors hover:text-[var(--primary)]">Golden Fight</a>
       </div>
     </div>
   );
