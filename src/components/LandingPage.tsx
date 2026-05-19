@@ -9,6 +9,7 @@ import { collection, query, where, getDocs, addDoc, serverTimestamp } from 'fire
 import { db } from '../lib/firebase';
 import { LandingPageConfig, Lead } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
+import { Helmet } from 'react-helmet-async';
 import { MessageCircle, Send, CheckCircle, Image as ImageIcon, Video, Star, Phone, User, Mail, MapPin } from 'lucide-react';
 
 export default function LandingPage() {
@@ -84,8 +85,36 @@ export default function LandingPage() {
   const primaryColor = config.primaryColor || '#f59e0b';
   const whatsappUrl = `https://wa.me/${config.whatsappNumber.replace(/\D/g, '')}?text=Olá! Gostaria de saber mais sobre as aulas de ${config.modality} em ${config.city}`;
 
+  const pageTitle = config?.title || `${modality} em ${city} | Aula Experimental Grátis`;
+  const pageDesc = config?.description || `Inscreva-se para aulas de ${modality} em ${city}. Venha conhecer nossa unidade e transforme sua vida.`;
+
   return (
     <div className="min-h-screen bg-[#0F0F10] text-white font-sans selection:bg-amber-500/30 overflow-x-hidden flex flex-col">
+      <Helmet>
+        <title>{pageTitle}</title>
+        <meta name="description" content={pageDesc} />
+        <meta property="og:title" content={pageTitle} />
+        <meta property="og:description" content={pageDesc} />
+        <meta property="og:type" content="website" />
+        <link rel="canonical" href={window.location.href} />
+        
+        {/* Structured Data for Google */}
+        <script type="application/ld+json">
+          {JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "LocalBusiness",
+            "name": `Dojô ${config?.modality || modality} ${config?.city || city}`,
+            "description": pageDesc,
+            "address": {
+              "@type": "PostalAddress",
+              "addressLocality": config?.city || city,
+              "addressRegion": "BR"
+            },
+            "telephone": config?.whatsappNumber
+          })}
+        </script>
+      </Helmet>
+
       {/* Navbar */}
       <nav className="px-6 md:px-12 py-6 flex justify-between items-center bg-gradient-to-b from-black/80 to-transparent fixed top-0 w-full z-50 backdrop-blur-sm">
         <div className="flex items-center gap-3">
