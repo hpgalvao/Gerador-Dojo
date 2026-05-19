@@ -46,9 +46,15 @@ Para rodar este projeto no seu computador:
 
 Diferente de sistemas antigos que salvam dados em um arquivo no seu PC, este projeto usa o **Firebase Firestore (Google)**:
 
-*   **Vantagem**: Se o seu PC quebrar, os dados das páginas e os leads continuam seguros na nuvem.
-*   **Acesso de qualquer lugar**: Você pode abrir o painel `/admin` de qualquer lugar do mundo e configurar suas páginas.
-*   **Persistência**: Mesmo que você baixe o projeto no seu computador, ele continuará lendo os dados do seu projeto Firebase configurado. Se você quiser que o banco de dados seja "só seu", você deve criar um projeto no console do Firebase e substituir o arquivo `firebase-applet-config.json` e as chaves em `src/lib/firebase.ts`.
+*   **Segurança e Privacidade**: O arquivo `firebase-applet-config.json` (que contém as chaves para o banco de dados oficial) está no `.gitignore`. Isso significa que **quem clonar o seu projeto NÃO terá acesso aos seus dados**, a menos que você forneça as chaves manualmente.
+*   **Vantagem**: Se o seu PC quebrar, os dados das páginas e os leads continuam seguros na nuvem do Google.
+*   **Configuração para novos usuários**: Se você clonou este projeto e quer usar seu próprio banco:
+    1. Crie um projeto no [Firebase Console](https://console.firebase.google.com/).
+    2. Ative o **Firestore Database** e o **Authentication** (método E-mail/Senha).
+    3. No console, vá em **Configurações do Projeto** (ícone de engrenagem) > **Geral**.
+    4. Role até "Seus aplicativos" e adicione um novo **Web App** (ícone `</>`).
+    5. Copie os valores do objeto `firebaseConfig` que aparecerão na tela.
+    6. Crie um arquivo `.env` na raiz do projeto e preencha as variáveis `VITE_FIREBASE_*` conforme os exemplos no arquivo `.env.example`.
 
 ## 🔗 Integração com CRM (Webhooks)
 
@@ -81,4 +87,12 @@ Este app utiliza **React (Vite)** e **Express**.
 Use o comando sugerido no painel "SSH Settings" para enviar via linha de comando.
 
 ## 🧠 Assistente de IA
+
 O painel administrativo possui um botão "Mágica". Ele utiliza o modelo Gemini da Google para sugerir títulos e textos de venda persuasivos baseados na cidade e modalidade informadas. 
+
+## ⚖️ Licença e Créditos
+
+Este projeto está sob a licença MIT com uma cláusula de atribuição:
+- Você é livre para usar, clonar e modificar.
+- **Deve manter os créditos** e o link para o repositório original de **Helio P. Galvão**.
+- Uma barra de créditos discreta é mantida no rodapé para fortalecer a comunidade de desenvolvedores de artes marciais.
