@@ -11,7 +11,7 @@ import { LandingPageConfig, Lead } from '../types';
 import { THEMES } from '../themes';
 import { motion, AnimatePresence } from 'motion/react';
 import { Helmet } from 'react-helmet-async';
-import { MessageCircle, Send, CheckCircle, Image as ImageIcon, Video, Star, Phone, User, Mail, MapPin } from 'lucide-react';
+import { MessageCircle, Send, CheckCircle, Image as ImageIcon, Video, Star, Phone, User, Mail, MapPin, Server } from 'lucide-react';
 
 export default function LandingPage() {
   const { city, modality } = useParams();
@@ -24,6 +24,8 @@ export default function LandingPage() {
   const [canUnlock, setCanUnlock] = useState(false);
   const [timer, setTimer] = useState(0);
   const [vslStarted, setVslStarted] = useState(false);
+
+  const [firebaseError, setFirebaseError] = useState(false);
 
   // VSL YouTube URL Parser Helper
   const getEmbedUrl = (url: string) => {
@@ -91,6 +93,11 @@ export default function LandingPage() {
 
   useEffect(() => {
     async function fetchConfig() {
+      if (!import.meta.env.VITE_FIREBASE_API_KEY || !db) {
+        setFirebaseError(true);
+        setLoading(false);
+        return;
+      }
       if (!city || !modality) return;
       const cleanCity = city.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-');
       const cleanModality = modality.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-');
@@ -109,8 +116,11 @@ export default function LandingPage() {
             setConfig(doc.data() as LandingPageConfig);
           }
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error("Error fetching LP config:", error);
+        if (error.code === 'auth/invalid-api-key' || error.message?.includes('API key')) {
+          setFirebaseError(true);
+        }
       } finally {
         setLoading(false);
       }
@@ -156,6 +166,19 @@ export default function LandingPage() {
       console.error("Error submitting lead:", error);
     }
   };
+
+  if (firebaseError) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-zinc-950 text-white p-6 text-center font-sans">
+        <div className="bg-red-500/10 w-16 h-16 rounded-full flex items-center justify-center mb-6 border border-red-500/20">
+          <Server className="text-red-500" size={24} />
+        </div>
+        <h1 className="text-2xl font-bold mb-4 uppercase tracking-tighter italic">Erro de Conexão</h1>
+        <p className="text-zinc-400 max-w-md text-sm leading-relaxed mb-8">Não foi possível conectar ao banco de dados. Verifique a configuração da <strong className="text-white">Firebase API Key</strong> nas configurações do projeto.</p>
+        <button onClick={() => window.location.reload()} className="px-8 py-3 bg-white text-black rounded-full font-bold uppercase tracking-widest text-[10px] hover:bg-zinc-200 transition-all">Tentar Novamente</button>
+      </div>
+    );
+  }
 
   if (loading) {
     return (
@@ -494,7 +517,11 @@ export default function LandingPage() {
                             className="w-full bg-black/40 border border-zinc-800 rounded-xl px-4 py-4 text-sm outline-none placeholder:text-zinc-700 transition-colors focus:border-[var(--primary)]"
                             placeholder="Ex: Roberto Silva"
                             value={lead.name}
-                            onChange={e => setLead({...lead, name: e.target.value})}
+                            onChange={e => {
+                              // Evita números no nome
+                              const value = e.target.value.replace(/[0-9]/g, '');
+                              setLead({...lead, name: value});
+                            }}
                           />
                         </div>
                         <div className="space-y-1.5">
@@ -516,7 +543,24 @@ export default function LandingPage() {
                             className="w-full bg-black/40 border border-zinc-800 rounded-xl px-4 py-4 text-sm outline-none placeholder:text-zinc-700 transition-colors focus:border-[var(--primary)]"
                             placeholder="(11) 99999-9999"
                             value={lead.phone}
-                            onChange={e => setLead({...lead, phone: e.target.value})}
+                            onChange={e => {
+                              // Remove tudo que não é dígito
+                              const digits = e.target.value.replace(/\D/g, '');
+                              
+                              if (digits.length <= 11) {
+                                let formatted = digits;
+                                if (digits.length > 2) {
+                                  formatted = `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
+                                }
+                                if (digits.length > 7) {
+                                  // Ajusta posição do hífen dependendo se tem 10 ou 11 dígitos
+                                  const isMobile = digits.length === 11;
+                                  const splitPos = isMobile ? 7 : 6;
+                                  formatted = `(${digits.slice(0, 2)}) ${digits.slice(2, splitPos)}-${digits.slice(splitPos)}`;
+                                }
+                                setLead({...lead, phone: formatted});
+                              }
+                            }}
                           />
                         </div>
                         <div className="pt-4">

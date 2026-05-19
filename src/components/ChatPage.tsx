@@ -10,7 +10,7 @@ import { collection, query, where, onSnapshot, addDoc, serverTimestamp } from 'f
 import { LandingPageConfig, ChatStep, ChatOption } from '../types';
 import { THEMES } from '../themes';
 import { motion, AnimatePresence } from 'motion/react';
-import { Send, ChevronLeft, MoreVertical, Camera, Phone, Video, Info, Image as ImageIcon, CheckCircle2, Play, Volume2, ExternalLink } from 'lucide-react';
+import { Send, ChevronLeft, MoreVertical, Camera, Phone, Video, Info, Image as ImageIcon, CheckCircle2, Play, Volume2, ExternalLink, Server } from 'lucide-react';
 
 export default function ChatPage() {
   const { city, modality } = useParams();
@@ -22,6 +22,7 @@ export default function ChatPage() {
   const [inputValue, setInputValue] = useState('');
   const [responses, setResponses] = useState<Record<string, any>>({});
   const [completed, setCompleted] = useState(false);
+  const [firebaseError, setFirebaseError] = useState(false);
   const [protocol] = useState(() => `${modality?.substring(0, 3).toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}`);
   const [lastInteraction, setLastInteraction] = useState(Date.now());
   const [isShaking, setIsShaking] = useState(false);
@@ -39,6 +40,11 @@ export default function ChatPage() {
   }, [lastInteraction, completed, isTyping]);
 
   useEffect(() => {
+    if (!import.meta.env.VITE_FIREBASE_API_KEY || !db) {
+      setFirebaseError(true);
+      setLoading(false);
+      return;
+    }
     if (!city || !modality) return;
 
     const cleanCity = city.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-');
@@ -57,6 +63,12 @@ export default function ChatPage() {
         setConfig({ ...data, id: snapshot.docs[0].id });
       }
       setLoading(false);
+    }, (error: any) => {
+      console.error("Chat Flow Snapshot Error:", error);
+      if (error.code === 'auth/invalid-api-key' || (error.message && error.message.includes('API key'))) {
+        setFirebaseError(true);
+        setLoading(false);
+      }
     });
 
     return () => unsub();
@@ -213,6 +225,17 @@ export default function ChatPage() {
       }).catch(e => console.warn("Webhook error:", e));
     }
   };
+
+  if (firebaseError) {
+    return (
+      <div className="min-h-screen bg-black flex flex-col items-center justify-center p-10 text-center font-sans text-white">
+        <Server className="text-red-500 mb-6" size={48} />
+        <h1 className="text-2xl font-black italic uppercase tracking-tighter mb-4">Erro de Transmissão</h1>
+        <p className="opacity-50 text-xs uppercase tracking-widest max-w-xs mb-8">O sinal com a central foi perdido. Verifique as credenciais do banco de dados.</p>
+        <button onClick={() => window.location.reload()} className="px-10 py-4 bg-zinc-900 border border-zinc-800 rounded-full text-[10px] font-black uppercase tracking-widest hover:bg-zinc-800 transition-all">Restabelecer Conexão</button>
+      </div>
+    );
+  }
 
   if (loading) return <div className="min-h-screen bg-black flex items-center justify-center"><div className="w-8 h-8 border-2 rounded-full animate-spin" style={{ borderTopColor: primaryColor }} /></div>;
   
@@ -486,7 +509,28 @@ export default function ChatPage() {
             placeholder="Mensagem..." 
             className="flex-1 bg-transparent border-none outline-none text-sm py-2 disabled:opacity-50"
             value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
+            onChange={(e) => {
+              const val = e.target.value;
+              const currentStep = config?.chatConfig?.steps[currentStepIndex];
+              
+              if (currentStep?.validationType === 'phone') {
+                const digits = val.replace(/\D/g, '');
+                if (digits.length <= 11) {
+                  let formatted = digits;
+                  if (digits.length > 2) formatted = `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
+                  if (digits.length > 7) {
+                    const isMobile = digits.length === 11;
+                    const splitPos = isMobile ? 7 : 6;
+                    formatted = `(${digits.slice(0, 2)}) ${digits.slice(2, splitPos)}-${digits.slice(splitPos)}`;
+                  }
+                  setInputValue(formatted);
+                }
+              } else if (currentStep?.validationType === 'name') {
+                setInputValue(val.replace(/[0-9]/g, ''));
+              } else {
+                setInputValue(val);
+              }
+            }}
             onKeyPress={(e) => e.key === 'Enter' && inputValue && handleUserInput(inputValue)}
             disabled={completed || isTyping || (config.chatConfig?.steps[currentStepIndex]?.type !== 'text' && messages.length > 0)}
           />

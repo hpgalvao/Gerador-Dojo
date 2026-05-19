@@ -18,6 +18,22 @@ const config = {
 
 const databaseId = import.meta.env.VITE_FIREBASE_DATABASE_ID || '(default)';
 
-const app = initializeApp(config);
-export const db = getFirestore(app, databaseId);
-export const auth = getAuth(app);
+let app;
+let db: any = null;
+let auth: any = null;
+
+const hasConfig = config.apiKey && config.projectId;
+
+if (hasConfig) {
+  try {
+    app = initializeApp(config);
+    db = getFirestore(app, databaseId);
+    auth = getAuth(app);
+  } catch (error) {
+    console.error("Firebase initialization failed:", error);
+  }
+} else {
+  console.warn("Firebase configuration missing or incomplete. Check environment variables.");
+}
+
+export { db, auth };

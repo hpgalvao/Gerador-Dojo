@@ -474,7 +474,16 @@ const ChatFlowEditor = ({ config, onChange, onUpdatePage }: { config: ChatConfig
 
 export default function AdminPanel() {
   const [pages, setPages] = useState<LandingPageConfig[]>([]);
-  const [viewMode, setViewMode] = useState<'card' | 'list'>('card');
+  const [viewMode, setViewMode] = useState<'card' | 'list'>('list');
+  const [firebaseError, setFirebaseError] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Initial check for mobile
+    if (window.innerWidth < 768) {
+      setViewMode('card');
+    }
+  }, []);
+
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 8;
   const [leads, setLeads] = useState<Lead[]>([]);
@@ -603,6 +612,14 @@ export default function AdminPanel() {
         modality,
         slug,
         title: 'Aprenda Jiu-Jitsu de Verdade em Joinville',
+        heroSubtitle: 'Método focado em defesa pessoal e condicionamento físico para todas as idades. Comece hoje sua jornada no Dojô Sul.',
+        formTitle: 'Comece sua jornada hoje',
+        formBadge: 'Vagas Limitadas',
+        sectionVideoTitle: 'Onde os Campeões Treinam',
+        sectionImagesTitle: 'NOSSO QUARTEL GENERAL',
+        sectionImagesSubtitle: 'A ESTRUTURA',
+        sectionImagesDescription: 'Temos a melhor estrutura do Sul do Brasil para você evoluir com segurança.',
+        sectionTestimonialsTitle: 'QUEM TREINA COMPROVA',
         description: 'Método focado em defesa pessoal e condicionamento físico para todas as idades. Comece hoje sua jornada no Dojô Sul.',
         ctaText: 'Garantir Aula Grátis',
         whatsappNumber: '00000000000',
@@ -651,13 +668,34 @@ export default function AdminPanel() {
   });
 
   useEffect(() => {
-    const unsubPages = onSnapshot(query(collection(db, 'landing_pages'), orderBy('academyName', 'asc')), (snap) => {
-      setPages(snap.docs.map(d => ({ id: d.id, ...d.data() } as LandingPageConfig)));
-    });
-    const unsubLeads = onSnapshot(query(collection(db, 'leads'), orderBy('createdAt', 'desc')), (snap) => {
-      setLeads(snap.docs.map(d => ({ id: d.id, ...d.data() } as Lead)));
-    });
-    return () => { unsubPages(); unsubLeads(); };
+    if (!import.meta.env.VITE_FIREBASE_API_KEY || !db) {
+      setFirebaseError('invalid-api-key');
+      return;
+    }
+
+    try {
+      const unsubPages = onSnapshot(query(collection(db, 'landing_pages'), orderBy('academyName', 'asc')), (snap) => {
+        setPages(snap.docs.map(d => ({ id: d.id, ...d.data() } as LandingPageConfig)));
+      }, (error: any) => {
+        console.error("Firebase Snapshot Error:", error);
+        if (error.code === 'auth/invalid-api-key' || (error.message && error.message.includes('API key'))) {
+          setFirebaseError('invalid-api-key');
+        }
+      });
+
+      const unsubLeads = onSnapshot(query(collection(db, 'leads'), orderBy('createdAt', 'desc')), (snap) => {
+        setLeads(snap.docs.map(d => ({ id: d.id, ...d.data() } as Lead)));
+      }, (error) => {
+        console.error("Firebase Leads Error:", error);
+      });
+
+      return () => { unsubPages(); unsubLeads(); };
+    } catch (e: any) {
+      console.error("Firebase Init Error:", e);
+      if (e.message?.includes('API key')) {
+        setFirebaseError('invalid-api-key');
+      }
+    }
   }, []);
 
   const handleCreateNew = () => {
@@ -668,6 +706,14 @@ export default function AdminPanel() {
       city: '',
       modality: '',
       title: 'Nova Landing Page',
+      heroSubtitle: 'Transforme sua vida através do esporte.',
+      formTitle: 'Garanta sua Aula Experimental',
+      formBadge: 'Oferta Exclusiva',
+      sectionVideoTitle: 'O Caminho do Guerreiro',
+      sectionImagesTitle: 'NOSSO QG',
+      sectionImagesSubtitle: 'A ACADEMIA',
+      sectionImagesDescription: 'Estrutura premium focada na sua evolução.',
+      sectionTestimonialsTitle: 'DOJO TALK',
       description: 'Prepare-se para transformar sua vida através do Jiu-Jitsu. Aulas para todas as idades e níveis.',
       ctaText: 'Agendar Aula Experimental',
       whatsappNumber: '',
@@ -796,6 +842,49 @@ export default function AdminPanel() {
   const totalPages = Math.ceil(pages.length / itemsPerPage);
 
   const paginate = (pageNumber: number) => setCurrentPage(pageNumber);
+
+  if (firebaseError) {
+    return (
+      <div className="min-h-screen bg-[#0F0F10] text-white font-sans flex items-center justify-center p-6 bg-[radial-gradient(circle_at_center,rgba(245,158,11,0.05)_0,transparent_100%)]">
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="max-w-md w-full bg-zinc-900 border border-zinc-800 p-10 rounded-[40px] text-center shadow-2xl relative overflow-hidden"
+        >
+          <div className="absolute top-0 left-0 w-full h-1 bg-amber-500"></div>
+          <div className="bg-red-500/10 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-8 border border-red-500/20">
+            <Server className="text-red-500" size={32} />
+          </div>
+          <h2 className="text-2xl font-black italic uppercase tracking-tighter mb-4">Erro de Conexão <span className="text-amber-500">Firebase</span></h2>
+          <p className="text-zinc-500 text-sm leading-relaxed mb-8 font-medium">
+            Não foi possível estabelecer uma conexão segura com o banco de dados. Isso geralmente ocorre devido a uma <span className="text-white font-bold">API Key inválida</span> ou configuração de segurança pendente.
+          </p>
+          
+          <div className="bg-black/40 rounded-2xl p-6 mb-8 text-left border border-zinc-800 space-y-4">
+            <div className="flex gap-3">
+              <div className="w-5 h-5 bg-amber-500/10 rounded-full flex items-center justify-center shrink-0 border border-amber-500/20 text-[10px] font-black text-amber-500">1</div>
+              <p className="text-xs text-zinc-400">Verifique os segredos no menu <span className="font-bold text-white">Configurações</span> do AI Studio.</p>
+            </div>
+            <div className="flex gap-3">
+              <div className="w-5 h-5 bg-amber-500/10 rounded-full flex items-center justify-center shrink-0 border border-amber-500/20 text-[10px] font-black text-amber-500">2</div>
+              <p className="text-xs text-zinc-400">Certifique-se de que as <span className="font-bold text-white">API Keys</span> não possuem espaços extras.</p>
+            </div>
+            <div className="flex gap-3">
+              <div className="w-5 h-5 bg-amber-500/10 rounded-full flex items-center justify-center shrink-0 border border-amber-500/20 text-[10px] font-black text-amber-500">3</div>
+              <p className="text-xs text-zinc-400">Tente atualizar a aba do navegador para recarregar as credenciais.</p>
+            </div>
+          </div>
+
+          <button 
+            onClick={() => window.location.reload()}
+            className="w-full bg-amber-500 hover:bg-amber-400 text-black py-4 rounded-2xl font-black uppercase tracking-widest text-xs transition-all shadow-xl shadow-amber-500/20 flex items-center justify-center gap-2"
+          >
+            Tentar Novamente <ExternalLink size={14} />
+          </button>
+        </motion.div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#0F0F10] text-white font-sans p-6 md:p-12 selection:bg-amber-500/30">
