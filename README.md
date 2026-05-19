@@ -4,7 +4,7 @@ Este projeto é uma ferramenta completa para gerar landing pages de alta convers
 
 ## 👤 Sobre o Autor
 
-Desenvolvido por **Helio P. Galvão**, professor de Jiu-Jitsu e Defesa Pessoal, além de Programador Fullstack com experiência desde 1998 (Clipper 5, Object Pascal, PHP, Python). 
+Desenvolvido por **Helio P. Galvão**, professor de Jiu-Jitsu e Defesa Pessoal, além de Programador Fullstack com experiência desde 1998 (Clipper 5, Object Pascal, PHP, Python, Lua, Node, etc...). 
 
 Atualmente focado em soluções tecnológicas para nichos específicos como Academias e Restaurantes. 
 - 🏢 Empresa: [SelectOne](https://selectone.com.br)
@@ -41,6 +41,17 @@ Para rodar este projeto no seu computador:
 2. **Instale as dependências**: `npm install`
 3. **Inicie o servidor**: `npm run dev`
 4. Acesse `http://localhost:3000/admin`.
+
+## 🔐 Segurança e Acesso Admin
+
+Para proteger seus dados e as configurações das suas páginas:
+
+1.  **Autenticação**: O painel `/admin` agora é protegido por login.
+2.  **Criando seu Usuário**:
+    -   No [Firebase Console](https://console.firebase.google.com/), vá em **Authentication**.
+    -   Ative o método **E-mail/Senha**.
+    -   Clique em **Add User** e crie seu e-mail e senha de acesso.
+3.  **Regras do Banco**: As regras no arquivo `firestore.rules` garantem que apenas você (autenticado) possa ler os leads e editar as páginas. As landing pages continuam públicas para os seus alunos.
 
 ## 🗄️ Sobre o Banco de Dados (Firebase)
 

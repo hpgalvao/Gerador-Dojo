@@ -5,10 +5,11 @@
 
 import React, { useEffect, useState } from 'react';
 import { collection, onSnapshot, addDoc, updateDoc, doc, deleteDoc, query, orderBy } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { signOut } from 'firebase/auth';
+import { auth, db } from '../lib/firebase';
 import { LandingPageConfig, Lead, Testimonial } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
-import { Plus, Layout, Users, Trash2, Edit2, ExternalLink, Save, X, PlusCircle, Trash, Copy, Sparkles, Server, Settings } from 'lucide-react';
+import { Plus, Layout, Users, Trash2, Edit2, ExternalLink, Save, X, PlusCircle, Trash, Copy, Sparkles, Server, Settings, LogOut } from 'lucide-react';
 
 export default function AdminPanel() {
   const [pages, setPages] = useState<LandingPageConfig[]>([]);
@@ -147,6 +148,14 @@ export default function AdminPanel() {
               className={`flex items-center gap-2 px-6 py-3 rounded-xl font-bold text-xs uppercase tracking-widest transition-all ${activeTab === 'settings' ? 'bg-amber-500 text-black shadow-lg shadow-amber-500/20' : 'text-zinc-500 hover:text-white'}`}
             >
               <Settings size={16} /> SSH
+            </button>
+            <div className="w-px h-8 bg-zinc-800 my-auto mx-2 self-center" />
+            <button 
+              onClick={() => signOut(auth)}
+              className="flex items-center gap-2 px-6 py-3 rounded-xl font-bold text-xs uppercase tracking-widest text-zinc-600 hover:text-red-500 transition-all"
+              title="Sair"
+            >
+              <LogOut size={16} />
             </button>
           </div>
         </header>
@@ -640,7 +649,7 @@ export default function AdminPanel() {
           <a href="https://goldenfight.com.br" target="_blank" className="hover:text-amber-500 transition-all">Golden Fight</a>
         </div>
         <div className="text-center space-y-1">
-          <p className="text-[9px] font-mono opacity-50 italic">Desenvolvido com ❤️ por Helio P. Galvão</p>
+          <p className="text-[9px] font-mono opacity-50 italic">Desenvolvido por Helio P. Galvão</p>
           <p className="text-[8px] font-mono tracking-widest uppercase text-zinc-700">Professor de BJJ & Dev Fullstack since 1998</p>
         </div>
       </footer>

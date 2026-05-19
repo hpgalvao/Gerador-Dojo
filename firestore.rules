@@ -18,13 +18,13 @@ service cloud.firestore {
     // Landing Pages
     match /landing_pages/{pageId} {
       allow read: if true; // Publicly readable
-      allow write: if true; // OPEN FOR PUBLIC AS REQUESTED - RISKY!
+      allow write: if request.auth != null; // Only authenticated users (admins) can edit
     }
 
     // Leads
     match /leads/{leadId} {
       allow create: if true; // Anyone can submit a lead
-      allow read, update, delete: if true; // Open for management as requested
+      allow read, update, delete: if request.auth != null; // Only admins can see lead data
     }
   }
 }
