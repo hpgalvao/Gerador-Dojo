@@ -8,14 +8,22 @@ import { collection, onSnapshot, addDoc, updateDoc, doc, deleteDoc, query, order
 import { db } from '../lib/firebase';
 import { LandingPageConfig, Lead, Testimonial } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
-import { Plus, Layout, Users, Trash2, Edit2, ExternalLink, Save, X, PlusCircle, Trash, Copy } from 'lucide-react';
+import { Plus, Layout, Users, Trash2, Edit2, ExternalLink, Save, X, PlusCircle, Trash, Copy, Sparkles, Server, Settings } from 'lucide-react';
 
 export default function AdminPanel() {
   const [pages, setPages] = useState<LandingPageConfig[]>([]);
   const [leads, setLeads] = useState<Lead[]>([]);
-  const [activeTab, setActiveTab] = useState<'pages' | 'leads'>('pages');
+  const [activeTab, setActiveTab] = useState<'pages' | 'leads' | 'settings'>('pages');
   const [isEditing, setIsEditing] = useState(false);
+  const [generating, setGenerating] = useState(false);
   const [editingPage, setEditingPage] = useState<Partial<LandingPageConfig> | null>(null);
+
+  // SSH Config (Mock state for persistence demo)
+  const [sshConfig, setSshConfig] = useState({
+    host: '',
+    user: '',
+    path: '/var/www/html'
+  });
 
   useEffect(() => {
     const unsubPages = onSnapshot(query(collection(db, 'landing_pages'), orderBy('updatedAt', 'desc')), (snap) => {
@@ -131,6 +139,12 @@ export default function AdminPanel() {
               <Users size={16} /> Leads 
               {leads.length > 0 && <span className={`ml-2 px-1.5 rounded-md text-[10px] ${activeTab === 'leads' ? 'bg-black text-white' : 'bg-red-500 text-white'}`}>{leads.length}</span>}
             </button>
+            <button 
+              onClick={() => setActiveTab('settings')}
+              className={`flex items-center gap-2 px-6 py-3 rounded-xl font-bold text-xs uppercase tracking-widest transition-all ${activeTab === 'settings' ? 'bg-amber-500 text-black shadow-lg shadow-amber-500/20' : 'text-zinc-500 hover:text-white'}`}
+            >
+              <Settings size={16} /> SSH
+            </button>
           </div>
         </header>
 
@@ -196,7 +210,7 @@ export default function AdminPanel() {
               ))}
             </div>
           </div>
-        ) : (
+        ) : activeTab === 'leads' ? (
           <div className="bg-zinc-900/30 rounded-[32px] border border-zinc-800 overflow-hidden backdrop-blur-md">
             <div className="overflow-x-auto">
               <table className="w-full text-left">
@@ -242,6 +256,62 @@ export default function AdminPanel() {
               </table>
             </div>
           </div>
+        ) : (
+            <div className="max-w-2xl mx-auto bg-zinc-900/50 p-10 rounded-[40px] border border-zinc-800 space-y-8">
+               <div>
+                  <h2 className="text-2xl font-bold mb-2">Configurações de Deploy</h2>
+                  <p className="text-zinc-500 text-sm">Configure os acessos SSH para facilitar o comando de exportação da pasta /dist.</p>
+               </div>
+               
+               <div className="space-y-6">
+                  <div className="space-y-2">
+                    <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">Host / IP do Servidor</label>
+                    <input 
+                      type="text" 
+                      className="w-full bg-black/40 border border-zinc-800 rounded-2xl px-6 py-4 outline-none focus:border-amber-500 transition-all font-mono"
+                      value={sshConfig.host}
+                      onChange={e => setSshConfig({...sshConfig, host: e.target.value})}
+                      placeholder="192.168.1.100"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">Usuário SSH</label>
+                    <input 
+                      type="text" 
+                      className="w-full bg-black/40 border border-zinc-800 rounded-2xl px-6 py-4 outline-none focus:border-amber-500 transition-all font-mono"
+                      value={sshConfig.user}
+                      onChange={e => setSshConfig({...sshConfig, user: e.target.value})}
+                      placeholder="root"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">Caminho Remoto</label>
+                    <input 
+                      type="text" 
+                      className="w-full bg-black/40 border border-zinc-800 rounded-2xl px-6 py-4 outline-none focus:border-amber-500 transition-all font-mono"
+                      value={sshConfig.path}
+                      onChange={e => setSshConfig({...sshConfig, path: e.target.value})}
+                      placeholder="/var/www/html/jiujitsu"
+                    />
+                  </div>
+               </div>
+
+               <div className="bg-black/50 p-6 rounded-2xl border border-zinc-800">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-amber-500 mb-4 flex items-center gap-2">
+                    <Server size={14} /> Comando Recomendado para o PC:
+                  </p>
+                  <code className="text-xs break-all text-zinc-400 block whitespace-pre-wrap">
+                    scp -r dist/* {sshConfig.user || 'user'}@{sshConfig.host || 'host'}:{sshConfig.path || '/remoto'}
+                  </code>
+               </div>
+               
+               <button 
+                  onClick={() => alert("Configurações salvas localmente nesta sessão.")}
+                  className="w-full py-4 bg-zinc-800 hover:bg-zinc-700 rounded-2xl font-bold uppercase tracking-widest text-xs transition-all"
+                >
+                  Salvar Configuração SSH
+                </button>
+            </div>
         )}
       </div>
 
@@ -271,6 +341,38 @@ export default function AdminPanel() {
               </div>
 
               <div className="p-10 space-y-12">
+                {/* AI Assistant Button */}
+                <div className="flex items-center gap-4 p-6 bg-amber-500/5 border border-amber-500/10 rounded-3xl">
+                   <div className="w-12 h-12 bg-amber-500 rounded-2xl flex items-center justify-center shadow-lg shadow-amber-500/20 shrink-0">
+                      <Sparkles className="text-black" />
+                   </div>
+                   <div className="flex-1">
+                      <h4 className="font-bold text-sm tracking-tight">Assistente de Copywriting</h4>
+                      <p className="text-[10px] text-zinc-500 uppercase tracking-widest font-medium">Gere textos persuasivos com Inteligência Artificial</p>
+                   </div>
+                   <button 
+                    disabled={generating || !editingPage?.city || !editingPage?.modality}
+                    onClick={async () => {
+                      setGenerating(true);
+                      try {
+                        const res = await fetch('/api/generate-copy', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ city: editingPage?.city, modality: editingPage?.modality })
+                        });
+                        const data = await res.json();
+                        setEditingPage({ ...editingPage, title: data.title, description: data.description });
+                      } catch (e) {
+                        alert("Certifique-se de preencher Cidade e Modalidade primeiro.");
+                      } finally {
+                        setGenerating(false);
+                      }
+                    }}
+                    className="px-6 py-3 bg-white text-black rounded-xl font-bold text-[10px] uppercase tracking-widest hover:bg-amber-500 transition-all disabled:opacity-50"
+                   >
+                     {generating ? 'Pensando...' : 'Mágica'}
+                   </button>
+                </div>
                 {/* Basic Info */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                   <div className="space-y-2">
