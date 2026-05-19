@@ -1,0 +1,61 @@
+{
+  "entities": {
+    "LandingPageConfig": {
+      "title": "LandingPageConfig",
+      "description": "Configuration for a specific landing page version.",
+      "type": "object",
+      "properties": {
+        "slug": { "type": "string", "description": "Unique identifier for the route (e.g., cidade-jiujitsu)" },
+        "city": { "type": "string" },
+        "modality": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "ctaText": { "type": "string" },
+        "whatsappNumber": { "type": "string" },
+        "showForm": { "type": "boolean" },
+        "videoUrl": { "type": "string" },
+        "images": { "type": "array", "items": { "type": "string" } },
+        "testimonials": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "text": { "type": "string" },
+              "role": { "type": "string" }
+            }
+          }
+        },
+        "primaryColor": { "type": "string" },
+        "campaignCode": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["slug", "city", "modality", "title", "whatsappNumber"]
+    },
+    "Lead": {
+      "title": "Lead",
+      "description": "Captured lead information.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "phone": { "type": "string" },
+        "city": { "type": "string" },
+        "modality": { "type": "string" },
+        "campaignCode": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "email", "phone"]
+    }
+  },
+  "firestore": {
+    "landing_pages/{pageId}": {
+      "schema": "LandingPageConfig",
+      "description": "Collection of landing page configurations."
+    },
+    "leads/{leadId}": {
+      "schema": "Lead",
+      "description": "Collection of captured leads."
+    }
+  }
+}

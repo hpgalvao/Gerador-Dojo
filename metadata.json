@@ -1,0 +1,11 @@
+{
+  "name": "Dojo Landing Page Generator",
+  "description": "Painel para geração de landing pages personalizadas para Dojôs de Jiu-Jitsu, com gerenciamento de imagens, textos e rotas por cidade/modalidade.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

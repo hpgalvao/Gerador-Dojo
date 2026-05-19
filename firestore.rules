@@ -1,0 +1,30 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper functions
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Landing Pages
+    match /landing_pages/{pageId} {
+      allow read: if true; // Publicly readable
+      allow write: if true; // OPEN FOR PUBLIC AS REQUESTED - RISKY!
+    }
+
+    // Leads
+    match /leads/{leadId} {
+      allow create: if true; // Anyone can submit a lead
+      allow read, update, delete: if true; // Open for management as requested
+    }
+  }
+}
