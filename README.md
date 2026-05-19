@@ -17,6 +17,12 @@ Este projeto oficial está hospedado em:
 
 Para utilizar em seu computador:
 
+DICA: No Windows11 você pode instalar o Git e o Node via PowerShell.
+   ```bash
+winget install Git.Git --force
+winget install OpenJS.NodeJS --force
+   ```
+
 1. **Clone o repositório**:
    ```bash
    git clone https://github.com/hpgalvao/Gerador-Dojo.git
@@ -42,16 +48,17 @@ Para rodar este projeto no seu computador:
 3. **Inicie o servidor**: `npm run dev`
 4. Acesse `http://localhost:3000/admin`.
 
-## 🔐 Segurança e Acesso Admin
+## 🔐 Primeiro Acesso (Como Logar)
 
-Para proteger seus dados e as configurações das suas páginas:
+Diferente de outros sistemas, não existe um "admin/admin" padrão. Como este projeto é seguro e usa o **seu próprio banco de dados**, você deve criar seu usuário primeiro:
 
-1.  **Autenticação**: O painel `/admin` agora é protegido por login.
-2.  **Criando seu Usuário**:
-    -   No [Firebase Console](https://console.firebase.google.com/), vá em **Authentication**.
-    -   Ative o método **E-mail/Senha**.
-    -   Clique em **Add User** e crie seu e-mail e senha de acesso.
-3.  **Regras do Banco**: As regras no arquivo `firestore.rules` garantem que apenas você (autenticado) possa ler os leads e editar as páginas. As landing pages continuam públicas para os seus alunos.
+1. Acesse o [Firebase Console](https://console.firebase.google.com/) do seu projeto.
+2. No menu lateral, clique em **Authentication**.
+3. Ative o método de login **E-mail/Senha**.
+4. Clique em **Add User** (Adicionar Usuário) e crie o seu e-mail e a sua senha de acesso.
+5. Pronto! Agora use esses dados na tela de login (`/admin`) do seu projeto instalado.
+
+> **Por que no Firebase e não no .env?** Fazemos isso para que as [regras de segurança](firestore.rules) do banco de dados protejam seus leads contra curiosos. Só quem está autenticado no seu Firebase pode ver os dados.
 
 ## 🗄️ Sobre o Banco de Dados (Firebase)
 

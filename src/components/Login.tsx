@@ -49,6 +49,12 @@ export default function Login() {
         </div>
 
         <form onSubmit={handleLogin} className="space-y-6">
+          <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-4 mb-6">
+            <p className="text-[10px] text-amber-200/70 leading-relaxed font-mono uppercase tracking-wider">
+              <span className="text-amber-500 font-bold">Dica de Setup:</span> Como o projeto usa Firebase Auth, você deve criar seu usuário no Console do Firebase &gt; Authentication &gt; Users.
+            </p>
+          </div>
+
           <div className="space-y-2">
             <label className="text-[10px] font-black uppercase tracking-widest text-zinc-600 ml-2">E-mail</label>
             <div className="relative">
