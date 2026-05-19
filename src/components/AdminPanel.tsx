@@ -37,12 +37,15 @@ export default function AdminPanel() {
 
   const handleCreateNew = () => {
     setEditingPage({
+      academyName: 'Dojô Central',
+      logoUrl: '',
       city: '',
       modality: '',
       title: 'Nova Landing Page',
       description: 'Prepare-se para transformar sua vida através do Jiu-Jitsu. Aulas para todas as idades e níveis.',
       ctaText: 'Agendar Aula Experimental',
       whatsappNumber: '',
+      webhookUrl: '',
       showForm: true,
       images: [],
       testimonials: [],
@@ -341,6 +344,30 @@ export default function AdminPanel() {
               </div>
 
               <div className="p-10 space-y-12">
+                {/* Branding Section */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 p-8 bg-zinc-900/30 rounded-[32px] border border-zinc-800/50">
+                  <div className="space-y-2">
+                    <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">Nome da Academia</label>
+                    <input 
+                      type="text" 
+                      className="w-full bg-black/40 border border-zinc-800 rounded-2xl px-6 py-4 outline-none focus:border-amber-500 transition-all font-bold text-white"
+                      value={editingPage?.academyName}
+                      onChange={e => setEditingPage({...editingPage, academyName: e.target.value})}
+                      placeholder="Ex: Dojô Golden"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">URL da Logo (PNG/SVG)</label>
+                    <input 
+                      type="text" 
+                      className="w-full bg-black/40 border border-zinc-800 rounded-2xl px-6 py-4 outline-none focus:border-amber-500 transition-all text-xs"
+                      value={editingPage?.logoUrl}
+                      onChange={e => setEditingPage({...editingPage, logoUrl: e.target.value})}
+                      placeholder="https://sua-logo.com/imagem.png"
+                    />
+                  </div>
+                </div>
+
                 {/* AI Assistant Button */}
                 <div className="flex items-center gap-4 p-6 bg-amber-500/5 border border-amber-500/10 rounded-3xl">
                    <div className="w-12 h-12 bg-amber-500 rounded-2xl flex items-center justify-center shadow-lg shadow-amber-500/20 shrink-0">
@@ -440,6 +467,19 @@ export default function AdminPanel() {
                       placeholder="5511999999999"
                     />
                   </div>
+                </div>
+
+                {/* Integration Section */}
+                <div className="space-y-2 p-8 bg-zinc-900/30 rounded-[32px] border border-zinc-800/50">
+                    <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">Webhook CRM (RD Station, Komo, etc)</label>
+                    <input 
+                      type="text" 
+                      className="w-full bg-black/40 border border-zinc-800 rounded-2xl px-6 py-4 outline-none focus:border-amber-500 transition-all font-mono text-xs text-amber-500/80"
+                      value={editingPage?.webhookUrl}
+                      onChange={e => setEditingPage({...editingPage, webhookUrl: e.target.value})}
+                      placeholder="https://hooks.zapier.com/..."
+                    />
+                    <p className="text-[9px] text-zinc-600 uppercase tracking-widest mt-2">Os dados do lead serão enviados via POST JSON para esta URL.</p>
                 </div>
 
                 {/* Styling & Media */}

@@ -54,6 +54,26 @@ export default function LandingPage() {
         createdAt: serverTimestamp(),
       };
       await addDoc(collection(db, 'leads'), leadData);
+
+      // Trigger Webhook if present
+      if (config.webhookUrl) {
+        try {
+          fetch(config.webhookUrl, {
+            method: 'POST',
+            mode: 'no-cors', // Many CRM webhooks don't return CORS headers
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              ...leadData,
+              academyName: config.academyName,
+              source: window.location.href,
+              submittedAt: new Date().toISOString()
+            })
+          }).catch(e => console.warn("Webhook background error:", e));
+        } catch (webhookErr) {
+          console.error("Webhook error:", webhookErr);
+        }
+      }
+
       setFormSubmitted(true);
     } catch (error) {
       console.error("Error submitting lead:", error);
@@ -103,8 +123,9 @@ export default function LandingPage() {
           {JSON.stringify({
             "@context": "https://schema.org",
             "@type": "LocalBusiness",
-            "name": `Dojô ${config?.modality || modality} ${config?.city || city}`,
+            "name": config?.academyName || `Dojô ${config?.modality || modality} ${config?.city || city}`,
             "description": pageDesc,
+            "image": config?.logoUrl || "",
             "address": {
               "@type": "PostalAddress",
               "addressLocality": config?.city || city,
@@ -118,10 +139,16 @@ export default function LandingPage() {
       {/* Navbar */}
       <nav className="px-6 md:px-12 py-6 flex justify-between items-center bg-gradient-to-b from-black/80 to-transparent fixed top-0 w-full z-50 backdrop-blur-sm">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-amber-500 flex items-center justify-center rounded-lg rotate-3 shadow-lg shadow-amber-500/30">
-            <span className="text-black font-black text-xl italic font-display">BJJ</span>
-          </div>
-          <h1 className="text-xl font-bold tracking-tight uppercase hidden sm:block">Dojô <span className="text-amber-500">{config.city}</span></h1>
+          {config.logoUrl ? (
+            <img src={config.logoUrl} alt={config.academyName} className="h-10 md:h-12 w-auto object-contain" referrerPolicy="no-referrer" />
+          ) : (
+            <div className="w-10 h-10 bg-amber-500 flex items-center justify-center rounded-lg rotate-3 shadow-lg shadow-amber-500/30">
+              <span className="text-black font-black text-xl italic font-display">BJJ</span>
+            </div>
+          )}
+          <h1 className="text-xl font-bold tracking-tight uppercase hidden sm:block">
+            {config.academyName || `Dojô ${config.city}`}
+          </h1>
         </div>
         <div className="flex gap-4 md:gap-8 text-xs font-bold uppercase tracking-widest">
           <a href="#" className="text-amber-500">Início</a>
@@ -406,8 +433,8 @@ export default function LandingPage() {
       </main>
 
       {/* Campaign Footer Bar */}
-      <div className="bg-zinc-950 px-12 py-4 border-t border-white/5 flex flex-col md:flex-row justify-between items-center text-[10px] uppercase tracking-[0.2em] text-zinc-600 gap-4 mt-20 md:mt-0">
-        <div>Propriedade: {config.city} Dojô</div>
+      <div className="bg-zinc-950 px-12 py-4 border-t border-white/5 flex flex-col md:flex-row justify-between items-center text-[10px] uppercase tracking-[0.2em] text-zinc-600 gap-4 mt-20 md:mt-0 font-mono">
+        <div>Propriedade: {config.academyName} • {config.city}</div>
         <div className="flex gap-6">
           <span className="text-amber-500/50">Campanha: {campaign}</span>
           <span>Template ID: #SLEEK-V2</span>
