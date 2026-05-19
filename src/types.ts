@@ -9,8 +9,36 @@ export interface Testimonial {
   role: string;
 }
 
+export type PageType = 'lp' | 'chat';
+
+export interface ChatOption {
+  label: string;
+  value: string;
+  imageUrl?: string;
+  nextStepId?: string;
+}
+
+export interface ChatStep {
+  id: string;
+  type: 'text' | 'image_options' | 'listbox' | 'media' | 'buttons';
+  message: string;
+  options?: ChatOption[];
+  mediaUrl?: string;
+  mediaType?: 'audio' | 'video';
+  multiSelect?: boolean;
+  nextStepId?: string;
+}
+
+export interface ChatConfig {
+  contactName: string;
+  contactPhotoUrl?: string;
+  backgroundImageUrl?: string;
+  steps: ChatStep[];
+}
+
 export interface LandingPageConfig {
   id?: string;
+  type?: PageType; // Adicionado para distinguir entre LP e Chat
   academyName: string;
   logoUrl?: string;
   slug: string; // cidade-modalidade
@@ -28,6 +56,7 @@ export interface LandingPageConfig {
   primaryColor: string;
   campaignCode: string;
   updatedAt: any;
+  chatConfig?: ChatConfig; // Configuração específica para o fluxo de chat
 }
 
 export interface Lead {

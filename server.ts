@@ -33,14 +33,64 @@ async function startServer() {
 
       const result = await model.generateContent(prompt);
       const response = await result.response;
-      const text = response.text();
+      let text = response.text();
       
-      // Extract JSON from response (handling potential markdown blocks)
-      const jsonStr = text.replace(/```json|```/g, "").trim();
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        throw new Error("Não foi possível encontrar JSON na resposta da IA.");
+      }
+      
+      const jsonStr = jsonMatch[0];
       res.json(JSON.parse(jsonStr));
     } catch (error) {
-      console.error(error);
-      res.status(500).json({ error: "Erro ao gerar texto com IA." });
+      console.error("AI Copy Generation Error:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : "Erro desconhecido ao gerar copy." });
+    }
+  });
+
+  app.post("/api/generate-chat", async (req, res) => {
+    const { city, modality } = req.body;
+    
+    if (!process.env.GEMINI_API_KEY) {
+      return res.status(500).json({ error: "GEMINI_API_KEY não configurada no servidor." });
+    }
+
+    try {
+      const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+
+      const prompt = `Gere um script de chatbot persuasivo para um dojô em ${city} focado em ${modality}.
+      O objetivo é capturar o nome e whatsapp para agendar aula experimental.
+      Use uma mistura de perguntas de texto, botões e listas.
+      Tipos permitidos: "text", "buttons", "image_options", "listbox", "media".
+      Formato JSON para o campo 'steps':
+      [
+        {"id": "1", "type": "text", "message": "Olá... qual seu nome?"},
+        {"id": "2", "type": "buttons", "message": "...", "options": [{"label": "Sim", "value": "sim", "nextStepId": "3"}]},
+        ...
+      ]
+      Responda APENAS o JSON com os campos: 
+      {
+        "contactName": "Mestre Helio",
+        "contactPhotoUrl": "https://images.unsplash.com/photo-1594381898411-846e7d193883?w=200&h=200&fit=crop",
+        "steps": [...]
+      }`;
+
+      const result = await model.generateContent(prompt);
+      const response = await result.response;
+      let text = response.text();
+      
+      // Extract JSON using a more robust method
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        throw new Error("Não foi possível encontrar JSON na resposta da IA.");
+      }
+      
+      const jsonStr = jsonMatch[0];
+      res.json(JSON.parse(jsonStr));
+    } catch (error) {
+      console.error("AI Generation Error:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : "Erro desconhecido ao gerar chat." });
     }
   });
 

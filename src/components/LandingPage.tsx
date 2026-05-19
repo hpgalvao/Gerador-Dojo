@@ -25,12 +25,22 @@ export default function LandingPage() {
   useEffect(() => {
     async function fetchConfig() {
       if (!city || !modality) return;
-      const slug = `${city}-${modality}`.toLowerCase();
+      const cleanCity = city.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-');
+      const cleanModality = modality.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-');
+      const slug = `${cleanCity}-${cleanModality}`;
+      
       try {
         const q = query(collection(db, 'landing_pages'), where('slug', '==', slug));
         const querySnapshot = await getDocs(q);
         if (!querySnapshot.empty) {
-          setConfig(querySnapshot.docs[0].data() as LandingPageConfig);
+          // Busca o primeiro que combine com o tipo LP ou que não tenha tipo (legado)
+          const doc = querySnapshot.docs.find(d => {
+            const t = d.data().type;
+            return t === 'lp' || !t;
+          });
+          if (doc) {
+            setConfig(doc.data() as LandingPageConfig);
+          }
         }
       } catch (error) {
         console.error("Error fetching LP config:", error);

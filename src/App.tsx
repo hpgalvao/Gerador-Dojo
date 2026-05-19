@@ -9,6 +9,7 @@ import { onAuthStateChanged, User } from 'firebase/auth';
 import { auth } from './lib/firebase';
 import AdminPanel from './components/AdminPanel';
 import LandingPage from './components/LandingPage';
+import ChatPage from './components/ChatPage';
 import Login from './components/Login';
 
 export default function App() {
@@ -31,15 +32,19 @@ export default function App() {
     );
   }
 
+  const adminPath = import.meta.env.VITE_ADMIN_PATH || "/admin";
+
   return (
     <BrowserRouter>
       <Routes>
         <Route 
-          path="/admin" 
+          path={adminPath} 
           element={user ? <AdminPanel /> : <Login />} 
         />
-        <Route path="/:city/:modality" element={<LandingPage />} />
-        <Route path="/" element={<Navigate to="/admin" replace />} />
+        <Route path="/lp/:city/:modality" element={<LandingPage />} />
+        <Route path="/chat/:city/:modality" element={<ChatPage />} />
+        <Route path="/:city/:modality" element={<LandingPage />} /> {/* Legado */}
+        <Route path="/" element={<Navigate to={adminPath} replace />} />
       </Routes>
     </BrowserRouter>
   );

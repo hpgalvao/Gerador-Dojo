@@ -1,116 +1,51 @@
-# Gerador Dojô 🥋
+# Dojô Landing Page Generator 🥋
 
-Este projeto é uma ferramenta completa para gerar landing pages de alta conversão para Dojôs e Academias. Ele permite criar múltiplas rotas (ex: `/sao-paulo/jiu-jitsu`) a partir de um único painel administrativo.
+Sistema de criação de Landing Pages e Chat Flows para Artes Marciais, com integração Firebase e IA.
 
-## 👤 Sobre o Autor
+## 🚀 Como Executar (Docker Compose + Traefik)
 
-Desenvolvido por **Helio P. Galvão**, professor de Jiu-Jitsu e Defesa Pessoal, além de Programador Fullstack com experiência desde 1998 (Clipper 5, Object Pascal, PHP, Python, Lua, Node, etc...). 
+Se você deseja realizar o deploy em seu próprio servidor utilizando Docker, aqui está a configuração recomendada.
 
-Atualmente focado em soluções tecnológicas para nichos específicos como Academias e Restaurantes. 
-- 🏢 Empresa: [SelectOne](https://selectone.com.br)
-- 🥋 Equipe: [Golden Fight](https://goldenfight.com.br)
+### `docker-compose.yml`
 
-## 📥 Como Clonar do GitHub
+```yaml
+services:
+  app:
+    build: .
+    container_name: dojo-app
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - VITE_ADMIN_PATH=/seu-admin-secreto
+      # Adicione as variáveis do Firebase aqui se desejar buildar em tempo de execução
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.dojo.rule=Host(`seu-dominio.com.br`)"
+      - "traefik.http.routers.dojo.entrypoints=websecure"
+      - "traefik.http.routers.dojo.tls.certresolver=myresolver"
+      - "traefik.http.services.dojo.loadbalancer.server.port=3000"
 
-Este projeto oficial está hospedado em:
-**[https://github.com/hpgalvao/Gerador-Dojo](https://github.com/hpgalvao/Gerador-Dojo)**
+networks:
+  default:
+    external:
+      name: web # Rede onde o Traefik está rodando
+```
 
-Para utilizar em seu computador:
+### Configurações Importantes
 
-DICA: No Windows11 você pode instalar o Git e o Node via PowerShell.
-   ```bash
-winget install Git.Git --force
-winget install OpenJS.NodeJS --force
-   ```
+1.  **VITE_ADMIN_PATH**: Altere esta variável no `.env` antes do build para proteger seu painel.
+2.  **Firebase**: Certifique-se de preencher todas as chaves no arquivo `.env`.
+3.  **Traefik**: Esta configuração assume que você já possui um Traefik rodando na rede `web` com um `certresolver` chamado `myresolver`.
 
-1. **Clone o repositório**:
-   ```bash
-   git clone https://github.com/hpgalvao/Gerador-Dojo.git
-   cd Gerador-Dojo
-   ```
-2. **Instale as dependências**:
-   ```bash
-   npm install
-   ```
-3. **Configure as variáveis de ambiente**:
-   Crie um arquivo `.env` baseado no `.env.example` e adicione sua `GEMINI_API_KEY`.
-4. **Rode o projeto**:
-   ```bash
-   npm run dev
-   ```
+## 🛠 Desenvolvimento
 
-## 🛠️ Instalação Local (Manual)
+```bash
+npm install
+npm run dev
+```
 
-Para rodar este projeto no seu computador:
+## 📦 Build para Produção
 
-1. **Abra o terminal** na pasta do projeto.
-2. **Instale as dependências**: `npm install`
-3. **Inicie o servidor**: `npm run dev`
-4. Acesse `http://localhost:3000/admin`.
-
-## 🔐 Primeiro Acesso (Como Logar)
-
-Diferente de outros sistemas, não existe um "admin/admin" padrão. Como este projeto é seguro e usa o **seu próprio banco de dados**, você deve criar seu usuário primeiro:
-
-1. Acesse o [Firebase Console](https://console.firebase.google.com/) do seu projeto.
-2. No menu lateral, clique em **Authentication**.
-3. Ative o método de login **E-mail/Senha**.
-4. Clique em **Add User** (Adicionar Usuário) e crie o seu e-mail e a sua senha de acesso.
-5. Pronto! Agora use esses dados na tela de login (`/admin`) do seu projeto instalado.
-
-> **Por que no Firebase e não no .env?** Fazemos isso para que as [regras de segurança](firestore.rules) do banco de dados protejam seus leads contra curiosos. Só quem está autenticado no seu Firebase pode ver os dados.
-
-## 🗄️ Sobre o Banco de Dados (Firebase)
-
-Diferente de sistemas antigos que salvam dados em um arquivo no seu PC, este projeto usa o **Firebase Firestore (Google)**:
-
-*   **Segurança e Privacidade**: O arquivo `firebase-applet-config.json` (que contém as chaves para o banco de dados oficial) está no `.gitignore`. Isso significa que **quem clonar o seu projeto NÃO terá acesso aos seus dados**, a menos que você forneça as chaves manualmente.
-*   **Vantagem**: Se o seu PC quebrar, os dados das páginas e os leads continuam seguros na nuvem do Google.
-*   **Configuração para novos usuários**: Se você clonou este projeto e quer usar seu próprio banco:
-    1. Crie um projeto no [Firebase Console](https://console.firebase.google.com/).
-    2. Ative o **Firestore Database** e o **Authentication** (método E-mail/Senha).
-    3. No console, vá em **Configurações do Projeto** (ícone de engrenagem) > **Geral**.
-    4. Role até "Seus aplicativos" e adicione um novo **Web App** (ícone `</>`).
-    5. Copie os valores do objeto `firebaseConfig` que aparecerão na tela.
-    6. Crie um arquivo `.env` na raiz do projeto e preencha as variáveis `VITE_FIREBASE_*` conforme os exemplos no arquivo `.env.example`.
-
-## 🔗 Integração com CRM (Webhooks)
-
-Você pode enviar os leads capturados para sistemas como **RD Station, Komo CRM, Bitrix24 ou Zapier**:
-
-1. No Painel Administrativo, vá na configuração da sua Landing Page.
-2. No campo **Webhook CRM**, cole a URL fornecida pelo seu sistema de CRM.
-3. Toda vez que um lead preencher o formulário, enviaremos um **POST JSON** para essa URL com:
-    *   Nome, E-mail e Telefone.
-    *   Cidade e Modalidade.
-    *   Código da Campanha.
-    *   Data e Hora da submissão.
-
-## 🖼️ Branding e Logos
-
-Agora cada landing page pode ter sua própria identidade:
-- **Nome da Academia**: Aparece no topo da página e nos metadados (SEO).
-- **URL da Logo**: Você pode colar o link direto da sua logo (.png ou .svg). Se a sua logo já contiver o símbolo e o nome, sugerimos deixar o campo "Nome da Academia" vazio se preferir apenas a imagem.
-
-## 🌐 Como Hospedar (Deploy)
-
-Este app utiliza **React (Vite)** e **Express**.
-
-### Opção A: Hospedagem Estática (HTML/CSS/JS)
-1. Rode: `npm run build`
-2. Suba o conteúdo da pasta `dist` para o seu servidor.
-3. *Atenção: O assistente de IA exige um servidor rodando Node.js. Se usar hospedagem estática pura, o botão de "Gerar com IA" não funcionará.*
-
-### Opção B: Deploy via SSH (Linux)
-Use o comando sugerido no painel "SSH Settings" para enviar via linha de comando.
-
-## 🧠 Assistente de IA
-
-O painel administrativo possui um botão "Mágica". Ele utiliza o modelo Gemini da Google para sugerir títulos e textos de venda persuasivos baseados na cidade e modalidade informadas. 
-
-## ⚖️ Licença e Créditos
-
-Este projeto está sob a licença MIT com uma cláusula de atribuição:
-- Você é livre para usar, clonar e modificar.
-- **Deve manter os créditos** e o link para o repositório original de **Helio P. Galvão**.
-- Uma barra de créditos discreta é mantida no rodapé para fortalecer a comunidade de desenvolvedores de artes marciais.
+```bash
+npm run build
+```
